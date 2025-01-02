@@ -1,31 +1,46 @@
 <?php
 session_start();
-require_once '../config/config.php'; // Update the path to your config file
-
-// Default admin credentials (stored directly for simplicity in this example)
-$defaultUsername = "admin";
-$defaultPasswordHash = password_hash("123", PASSWORD_BCRYPT); // Hashed password for "123"
+require_once '../config/config.php'; // Include the config file for database connection
 
 if (isset($_POST['login'])) {
+    // Get input from the form
     $username = $_POST['username'];
     $password = $_POST['password'];
 
-    if ($username === $defaultUsername && password_verify($password, $defaultPasswordHash)) {
-        // Login success
-        $_SESSION['admin_logged_in'] = true;
-        $_SESSION['admin_username'] = $username;
-        header("Location: index.php");
-        exit;
-    } else {
-        // Login failed
-        echo "<script>alert('Invalid Username or Password');</script>";
+    try {
+        // Prepare the SQL query to fetch the admin user
+        $stmt = $pdo->prepare("SELECT username, password FROM admin_users WHERE username = :username");
+        $stmt->bindParam(':username', $username);
+        $stmt->execute();
+
+        if ($stmt->rowCount() > 0) {
+            // Fetch the admin user record
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Compare passwords directly
+            if ($password === $user['password']) {
+                // Login success
+                $_SESSION['admin_logged_in'] = true;
+                $_SESSION['admin_username'] = $user['username'];
+                header("Location: index.php");
+                exit;
+            } else {
+                // Invalid password
+                echo "<script>alert('Invalid Username or Password');</script>";
+            }
+        } else {
+            // Username not found
+            echo "<script>alert('Invalid Username or Password');</script>";
+        }
+    } catch (PDOException $e) {
+        // Handle query error
+        echo "<script>alert('Database error: " . $e->getMessage() . "');</script>";
     }
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-   
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login</title>
