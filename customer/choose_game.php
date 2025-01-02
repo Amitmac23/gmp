@@ -96,7 +96,7 @@ try {
         <div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-4">
     <?php foreach ($games as $game): ?>
         <div class="col">
-            <div class="game-card" data-aos="zoom-in" data-aos-delay="<?= $game['id'] * 100 ?>">
+            <div class="game-card" data-aos="zoom-in" >
                 <img src="../assets/images/<?= htmlspecialchars($game['game_image']) ?>" 
                      alt="<?= htmlspecialchars($game['name']) ?>" class="game-image">
                 <div class="game-card-body">
