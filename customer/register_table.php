@@ -33,6 +33,7 @@ if (!$table) {
     exit;
 }
 
+<<<<<<< Updated upstream
 // Fetch booked slots from the database
 $query = "SELECT start_time, end_time FROM bookings";
 $result = $pdo->query($query);
@@ -44,6 +45,25 @@ while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
         'start' => date('H:i', strtotime($row['start_time'])),
         'end' => date('H:i', strtotime($row['end_time']))
     ];
+=======
+// Check if the table is already booked
+if ($table['status'] === 'booked') {
+    echo "<div style='
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        height: 100vh; 
+        background-color: #f8f9fa; 
+        font-family: Arial, sans-serif; 
+        text-align: center;
+    '>
+        <div style='padding: 20px; background: #fff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border-radius: 8px;'>
+            <h2 style='color: #d9534f;'>Table Already Booked</h2>
+            <p style='color: #6c757d;'>This table has already been booked. Please select a different table.
+        </div>
+    </div>";
+    exit;
+>>>>>>> Stashed changes
 }
 
 $game_id = $table['game_id']; // Get the game_id from the table
@@ -430,7 +450,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Decrement player count
     decreasePlayer.addEventListener('click', () => {
         let currentCount = parseInt(playerCountInput.value);
+<<<<<<< Updated upstream
         if (currentCount > 1) {
+=======
+        if (currentCount > 1) { // Allow decrement to 0 or below, but not negative
+>>>>>>> Stashed changes
             playerCountInput.value = currentCount - 1;
             updateDetails();
         }
