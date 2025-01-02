@@ -33,18 +33,26 @@ if (!$table) {
     exit;
 }
 
-// Fetch booked slots from the database
-$query = "SELECT start_time, end_time FROM bookings";
-$result = $pdo->query($query);
-
-$booked_slots = [];
-while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
-    $booked_slots[] = [
-        'date' => date('Y-m-d', strtotime($row['start_time'])),
-        'start' => date('H:i', strtotime($row['start_time'])),
-        'end' => date('H:i', strtotime($row['end_time']))
-    ];
+// Check if the table is already booked
+if ($table['status'] === 'booked') {
+    echo "<div style='
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        height: 100vh; 
+        background-color: #f8f9fa; 
+        font-family: Arial, sans-serif; 
+        text-align: center;
+    '>
+        <div style='padding: 20px; background: #fff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border-radius: 8px;'>
+            <h2 style='color: #d9534f;'>Table Already Booked</h2>
+            <p style='color: #6c757d;'>This table has already been booked. Please select a different table.</p>
+        </div>
+    </div>";
+        exit;
 }
+
+
 
 $game_id = $table['game_id']; // Get the game_id from the table
 $price_per_half_hour = $table['price_per_half_hour']; // Get the price per half-hour
@@ -62,15 +70,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Validate and format the start time
     try {
-        // Convert start time to DateTime object in UTC first
-        $start_time = new DateTime($start_time_input, new DateTimeZone('UTC')); // Assuming input time is in UTC
-        $start_time->setTimezone(new DateTimeZone('Asia/Kolkata')); // Convert to IST
-        $start_time_formatted = $start_time->format('Y-m-d H:i:s'); // Format to store in the DB
+        // Convert start time to DateTime object
+        $start_time = new DateTime($start_time_input, new DateTimeZone('Asia/Kolkata'));
+        $start_time_formatted = $start_time->format('Y-m-d H:i:s');
 
         // Calculate end time
         $end_time = clone $start_time;
         $end_time->modify('+' . $duration . ' minutes');
-        $end_time_formatted = $end_time->format('Y-m-d H:i:s'); // Format end time in IST
+        $end_time_formatted = $end_time->format('Y-m-d H:i:s');
 
         // Validate player count
         if ($player_count < $min_capacity || $player_count > $max_capacity) {
@@ -101,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $customer_id = $pdo->lastInsertId();
         }
 
-        // Insert booking information into the bookings table with IST times
+        // Insert booking information into the bookings table
         $stmt = $pdo->prepare("INSERT INTO bookings (table_id, game_id, customer_id, start_time, duration, end_time, total_price, player_count)
                                VALUES (:table_id, :game_id, :customer_id, :start_time, :duration, :end_time, :total_price, :player_count)");
         $stmt->execute([
@@ -132,8 +139,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-
-
 
 
 <!DOCTYPE html>
@@ -275,7 +280,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="text" name="name" id="name" class="form-control" required>
 
                 <label for="phone" class="form-label">Phone Number:</label>
-                <input type="text" name="phone" id="phone" class="form-control" required>
+                <input type="text" name="phone" id="phone" class="form-control" required 
+                       maxlength="10" pattern="\d{10}" title="Enter a valid 10-digit phone number">
+
 
                 <label for="start_time" class="form-label">Start Time:</label>
                 <select name="start_time" id="start_time" class="form-control" required></select>
@@ -319,53 +326,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const increasePlayer = document.getElementById('increasePlayer');
     const decreasePlayer = document.getElementById('decreasePlayer');
 
-    // Fetch current date
-    const currentDate = new Date().toISOString().split('T')[0]; // Format: 'YYYY-MM-DD'
-
     // Fetched from PHP dynamically
     const minCapacity = <?php echo $min_capacity; ?>;
     const maxCapacity = <?php echo $max_capacity; ?>;
     const extraChargePerPlayer = <?php echo $extra_charge; ?>;
     const pricePerHalfHour = <?php echo $price_per_half_hour; ?>;
-    const bookedSlots = <?php echo json_encode($booked_slots); ?>; // Format: [{date: 'YYYY-MM-DD', start: 'HH:MM', end: 'HH:MM'}, ...]
 
+    // Fetch current time and add 5 minutes
     const currentTime = new Date();
     currentTime.setMinutes(currentTime.getMinutes() + 5); // Start from current time + 5 minutes
     currentTime.setSeconds(0); // Set seconds to 0 to match the start time format
 
-    const closingTime = new Date();
-    closingTime.setHours(19, 0, 0); // 7:00 PM (19:00)
-
-    let tempTime = new Date(currentTime);
-
-    // Helper to check if a time overlaps with booked slots for the current date
-    function isTimeAvailable(time) {
-        const timeMinutes = time.getHours() * 60 + time.getMinutes();
-        const formattedDate = time.toISOString().split('T')[0]; // Get the date in 'YYYY-MM-DD'
-
-        return !bookedSlots.some(slot => {
-            if (slot.date === formattedDate) {
-                const startMinutes = parseInt(slot.start.split(':')[0]) * 60 + parseInt(slot.start.split(':')[1]);
-                const endMinutes = parseInt(slot.end.split(':')[0]) * 60 + parseInt(slot.end.split(':')[1]);
-                return timeMinutes >= startMinutes && timeMinutes < endMinutes;
-            }
-            return false;
-        });
-    }
-
-    // Add options for every 5 minutes starting from 5 minutes ahead
-    while (tempTime <= closingTime) {
-        if (isTimeAvailable(tempTime)) {
-            const indiaTime = new Date(tempTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-
-            const option = document.createElement('option');
-            option.value = indiaTime.toISOString(); // Store ISO string for database
-            option.textContent = formatTime(indiaTime); // Display IST time
-
-            timeSelect.appendChild(option);
-        }
-        tempTime.setMinutes(tempTime.getMinutes() + 5); // Increment by 5 minutes
-    }
+    // Add a single option for the current time + 5 minutes
+    const indiaTime = new Date(currentTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const option = document.createElement('option');
+    option.value = indiaTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+    option.textContent = formatTime(indiaTime); // Format the time for display
+    timeSelect.appendChild(option);
 
     // Format time to HH:MM AM/PM
     function formatTime(date) {
@@ -379,7 +356,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update exit time and total price based on start time, duration, and player count
     function updateDetails() {
-        const startTime = new Date(timeSelect.value); // Use selected time from dropdown
+        const startTime = new Date(timeSelect.value);
+        startTime.setSeconds(0); // Set seconds to 0 to match the start time format
         const duration = parseInt(durationInput.value);
         const playerCount = parseInt(playerCountInput.value);
 
@@ -401,18 +379,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const exitTime = new Date(startTime);
         exitTime.setMinutes(exitTime.getMinutes() + duration);
 
-        if (exitTime <= closingTime && isTimeAvailable(exitTime)) {
+        const closingTime = new Date();
+        closingTime.setHours(19, 0, 0); // Closing time: 7:00 PM
+
+        if (exitTime <= closingTime) {
             endTimeInput.value = formatTime(exitTime);
 
+            // Calculate the base price based on duration and price per half hour
             let totalPrice = (duration / 60) * pricePerHalfHour;
+
+            // Apply extra charge for each player exceeding the minimum capacity
             if (playerCount > minCapacity) {
                 const extraPlayers = playerCount - minCapacity;
-                totalPrice += extraPlayers * extraChargePerPlayer;
+                totalPrice += extraPlayers * extraChargePerPlayer; // Extra charge per exceeding player
             }
 
             totalPriceInput.value = totalPrice.toFixed(2);
         } else {
-            alert('Selected duration exceeds closing time or overlaps with a booked slot.');
+            alert('Selected duration exceeds closing time.');
             durationInput.value = '';
         }
     }
@@ -420,9 +404,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Increment player count
     increasePlayer.addEventListener('click', () => {
         let currentCount = parseInt(playerCountInput.value);
-        if (currentCount < maxCapacity) {
+        if (currentCount < maxCapacity) { // Ensure player count does not exceed maxCapacity
             playerCountInput.value = currentCount + 1;
-            updateDetails();
+            updateDetails(); // Update details after increment
         } else {
             alert(`Player count cannot exceed ${maxCapacity}.`);
         }
@@ -431,9 +415,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Decrement player count
     decreasePlayer.addEventListener('click', () => {
         let currentCount = parseInt(playerCountInput.value);
-        if (currentCount > 1) {
+        if (currentCount > 1) { // Allow decrement to 1 or above
             playerCountInput.value = currentCount - 1;
-            updateDetails();
+            updateDetails(); // Update details after decrement
         }
     });
 

@@ -531,22 +531,25 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize countdown on page load
     updateCountdown();
 
-    // Populate the time dropdown with available times
-    const currentTime = new Date();
-    currentTime.setMinutes(currentTime.getMinutes() + 5);
-    const endTime = new Date();
-    endTime.setHours(19, 0, 0);  // 6:00 PM
+// Populate the time dropdown with a single available time
+const currentTime = new Date();
+currentTime.setMinutes(currentTime.getMinutes() + 5); // Start from current time + 5 minutes
+currentTime.setSeconds(0); // Set seconds to 0 for consistency
 
-    let tempTime = new Date(currentTime);
-    while (tempTime <= endTime) {
-        const option = document.createElement('option');
-        option.value = formatTime(tempTime);
-        option.textContent = formatTime(tempTime);
-        timeSelect.appendChild(option);
-        tempTime.setMinutes(tempTime.getMinutes() + 5); // increment by 5 minutes
-    }
+const endTime = new Date();
+endTime.setHours(19, 0, 0); // Closing time: 7:00 PM
 
-    timeSelect.value = timeSelect.options[0].value;  // Set default value
+if (currentTime <= endTime) {
+    const option = document.createElement('option');
+    option.value = formatTime(currentTime);
+    option.textContent = formatTime(currentTime); // Display time in formatted style
+    timeSelect.appendChild(option);
+}
+
+// Set the default value of the dropdown to the single available option
+if (timeSelect.options.length > 0) {
+    timeSelect.value = timeSelect.options[0].value;
+}
 
     // Handle table booking
     document.querySelectorAll('.btn-book').forEach(btn => {
@@ -591,8 +594,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Initialize table details fetch
-    fetchTableDetails();
+   
 });
 
 
