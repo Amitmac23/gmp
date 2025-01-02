@@ -11,7 +11,7 @@ if (!$table_id) {
     exit;
 }
 
-// Fetch game_id, price_per_half_hour, table_number from the tables table based on the table_id
+// Fetch game_id, price_per_half_hour, table_number, and status from the tables table based on the table_id
 $stmt = $pdo->prepare("
     SELECT 
         game_id, 
@@ -30,6 +30,26 @@ $table = $stmt->fetch();
 // If no table is found, display an error
 if (!$table) {
     echo "Table not found.";
+    exit;
+}
+
+// Check if the table is already booked
+if ($table['status'] === 'booked') {
+    echo "<div style='
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        height: 100vh; 
+        background-color: #f8f9fa; 
+        font-family: Arial, sans-serif; 
+        text-align: center;
+    '>
+        <div style='padding: 20px; background: #fff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border-radius: 8px;'>
+            <h2 style='color: #d9534f;'>Table Already Booked</h2>
+            <p style='color: #6c757d;'>This table has already been booked. Please select a different table.</p>
+            <a href='select_table.php?id=" . $table['game_id'] . "' style='text-decoration: none; padding: 10px 20px; background: #007bff; color: #fff; border-radius: 4px;'>Back to Tables</a>
+        </div>
+    </div>";
     exit;
 }
 
