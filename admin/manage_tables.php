@@ -127,7 +127,7 @@ if (isset($_GET['delete_table_id'])) {
 // Handle QR Code Generation Request
 if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
     $table_id = $_GET['table_id'];
-    $base_url = "http://cz.osportal.in/customer/register_table.php";
+    $base_url = "http://192.168.29.236/customer/register_table.php";
     $qr_data = $base_url . "?id=" . $table_id;
 
     $local_qr_dir = __DIR__ . '/../assets/qrcodes/';
