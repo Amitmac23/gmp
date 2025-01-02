@@ -4,7 +4,6 @@ $host = 'localhost';       // Database host (usually 'localhost')
 $dbname = 'gmp';  // Name of your database
 $username = 'root';        // Database username
 $password = '';            // Database password (leave empty for XAMPP)
-//hello world
 
 // Create a connection using PDO
 try {
