@@ -126,7 +126,7 @@ function calculateTimeLeft($start_time, $end_time) {
                                                     SELECT b.*, c.name AS customer_name 
                                                     FROM bookings b
                                                     LEFT JOIN customers c ON b.customer_id = c.id
-                                                    WHERE b.table_id = ? 
+                                                    WHERE b.table_id = ? AND b.canceled = 0
                                                     ORDER BY b.start_time DESC LIMIT 1
                                                 ");
                                                 $stmt->execute([$table['table_id']]);
@@ -176,6 +176,7 @@ function calculateTimeLeft($start_time, $end_time) {
         </div>
     <?php endforeach; ?>
 </div>
+
 
 <script>
     // Function to update countdown timer and remove past booking details
