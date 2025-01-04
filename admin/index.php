@@ -98,7 +98,7 @@ function calculateTimeLeft($start_time, $end_time) {
     </style>
 </head>
 <body>
-<div class="container mt-5">
+ <div class="container mt-5">
     <h3 class="text-center mb-4">Game Table Dashboard</h3>
 
    <div class="row">
@@ -106,7 +106,7 @@ function calculateTimeLeft($start_time, $end_time) {
         <div class="col-md-6">
             <div class="card table-card">
                 <div class="card-header">
-                    <img src="http://192.168.29.236/gmp/assets/images/<?php echo htmlspecialchars($game['game_image']); ?>" alt="<?php echo htmlspecialchars($game['game_name']); ?>" class="me-3 table-image">
+                    <img src="../assets/images/<?php echo htmlspecialchars($game['game_image']); ?>" alt="<?php echo htmlspecialchars($game['game_name']); ?>" class="me-3 table-image">
                     <?php echo htmlspecialchars($game['game_name']); ?> - Tables
                 </div>
                 <div class="card-body">
