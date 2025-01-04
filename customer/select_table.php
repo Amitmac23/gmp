@@ -127,6 +127,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+
+
 // Get the bookings for each table
 $query = "
     SELECT b.start_time, b.end_time, c.name AS customer_name 
@@ -143,6 +145,8 @@ foreach ($tables as $table) {
     $stmt->execute(['table_id' => $table['table_id']]);
     $booking = $stmt->fetch();
 }
+
+
 ?>
 
 
@@ -237,7 +241,8 @@ foreach ($tables as $table) {
                         <p><strong>End Time:</strong> <?= date('h:i A', strtotime($end_time)) ?></p>
                         <p><strong>Time Remaining:</strong> 
                             <span id="timer-<?= $table['table_id'] ?>" 
-                                  data-end-time="<?= date('Y-m-d H:i:s', strtotime($end_time)) ?>">Waiting to start</span>
+                                  data-end-time="<?= date('Y-m-d H:i:s', strtotime($end_time)) ?>"
+                                  data-start-time="<?= date('Y-m-d H:i:s', strtotime($start_time)) ?>">Waiting to start</span>
                         </p>
                         <p><strong>Total Price:</strong> 
                             <span id="total-price-<?= $table['table_id'] ?>"><?= htmlspecialchars($total_price) ?></span>
@@ -249,6 +254,7 @@ foreach ($tables as $table) {
         <?php endforeach; ?>
     </div>
 </div>
+
 
 <!-- Modal for Table Booking -->
 <div class="modal fade" id="bookTableModal" tabindex="-1" aria-labelledby="bookTableModalLabel" aria-hidden="true">
@@ -448,84 +454,90 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Update total price and exit time based on duration
     function updateCountdown() {
-        const timers = document.querySelectorAll('[id^="timer-"]'); // Select all elements with ids starting with "timer-"
-        
-        timers.forEach(function (timer) {
-            const tableId = timer.closest('[data-table-id]') ? timer.closest('[data-table-id]').getAttribute('data-table-id') : null;
+    const timers = document.querySelectorAll('[id^="timer-"]'); // Select all elements with ids starting with "timer-"
 
-            // Check if tableId is null
-            if (!tableId) {
-                console.error("Table ID is missing!");
-                return;
-            }
+    timers.forEach(function (timer) {
+        const tableId = timer.closest('[data-table-id]') ? timer.closest('[data-table-id]').getAttribute('data-table-id') : null;
 
-            const endTimeString = timer.getAttribute('data-end-time');
-            if (!endTimeString) {
-                console.error("End time is missing for table ID:", tableId);
-                return;
-            }
+        // Check if tableId is null
+        if (!tableId) {
+            console.error("Table ID is missing!");
+            return;
+        }
 
-            // Convert the end time string to Unix timestamp
-            const endTime = Date.parse(endTimeString) / 1000;
-            const now = Math.floor(new Date().getTime() / 1000); // Current time in Unix timestamp (seconds)
+        const endTimeString = timer.getAttribute('data-end-time');
+        const startTimeString = timer.getAttribute('data-start-time'); // Get the start time
 
-            if (now < endTime) {
-                // If current time is before end time, show the remaining time
-                const remainingTime = endTime - now;
+        if (!endTimeString || !startTimeString) {
+            console.error("Start or end time is missing for table ID:", tableId);
+            return;
+        }
 
-                const hours = Math.floor(remainingTime / (60 * 60));
-                const minutes = Math.floor((remainingTime % (60 * 60)) / 60);
-                const seconds = remainingTime % 60;
+        // Convert the start and end time strings to Unix timestamps
+        const startTime = Date.parse(startTimeString) / 1000;
+        const endTime = Date.parse(endTimeString) / 1000;
+        const now = Math.floor(new Date().getTime() / 1000); // Current time in Unix timestamp (seconds)
 
-                // Display the countdown in HH:mm:ss format
-                timer.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            } else {
-                // If the time has passed, show "00:00:00" and update the table status
-                timer.textContent = '00:00:00';
+        if (now < startTime) {
+            // If current time is before start time, show "Waiting to start"
+            timer.textContent = 'Waiting to start';
+        } else if (now >= startTime && now < endTime) {
+            // If current time is between start time and end time, show the remaining time
+            const remainingTime = endTime - now;
 
-                // Send an AJAX request to update the status in the database
-                fetch('update_table_status.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ table_id: tableId }) // Ensure tableId is passed here
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Update the UI to reflect the new status
-                        const tableCard = document.getElementById(`table-card-${tableId}`);
-                        if (tableCard) {
-                            tableCard.classList.remove('booked');
-                            tableCard.classList.add('available');
-                            
-                            const statusText = tableCard.querySelector('p');
-                            if (statusText) {
-                                statusText.innerHTML = 'Status: <span class="text-success">Available</span>';
-                            }
-                            
-                            // Enable the "Book Now" button
-                            const bookButton = tableCard.querySelector('.btn-book');
-                            if (bookButton) {
-                                bookButton.disabled = false;
-                            }
+            const hours = Math.floor(remainingTime / (60 * 60));
+            const minutes = Math.floor((remainingTime % (60 * 60)) / 60);
+            const seconds = remainingTime % 60;
+
+            // Display the countdown in HH:mm:ss format
+            timer.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        } else {
+            // If the time has passed, show "00:00:00" and update the table status
+            timer.textContent = '00:00:00';
+
+            // Send an AJAX request to update the status in the database
+            fetch('update_table_status.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ table_id: tableId }) // Ensure tableId is passed here
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the UI to reflect the new status
+                    const tableCard = document.getElementById(`table-card-${tableId}`);
+                    if (tableCard) {
+                        tableCard.classList.remove('booked');
+                        tableCard.classList.add('available');
+
+                        const statusText = tableCard.querySelector('p');
+                        if (statusText) {
+                            statusText.innerHTML = 'Status: <span class="text-success">Available</span>';
                         }
 
-                        // Optionally reload the page to refresh all states
-                        location.reload();
-                    } else {
-                        console.error("Failed to update table status");
+                        // Enable the "Book Now" button
+                        const bookButton = tableCard.querySelector('.btn-book');
+                        if (bookButton) {
+                            bookButton.disabled = false;
+                        }
                     }
-                })
-                .catch(error => {
-                    console.error("Error:", error);
-                });
-            }
-        });
-    }
 
-    // Call updateCountdown every second
+                    // Optionally reload the page to refresh all states
+                    location.reload();
+                } else {
+                    console.error("Failed to update table status");
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+            });
+        }
+    });
+}
+
+  // Call updateCountdown every second
     setInterval(updateCountdown, 1000);
 
     // Initialize countdown on page load
