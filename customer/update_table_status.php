@@ -1,5 +1,4 @@
 <?php
-// update_table_status.php
 
 // Include your database connection
 require_once '../config/config.php'; // Update the path to match your project structure
@@ -11,7 +10,7 @@ $tableId = $data['table_id'] ?? null;
 // Debugging: Log the received table ID
 error_log("Received Table ID: " . var_export($tableId, true)); 
 
-if ($tableId) {
+if ($tableId && is_numeric($tableId)) {
     try {
         // Update the table status to 'available' in the database
         $stmt = $pdo->prepare("UPDATE tables SET status = 'available' WHERE id = :table_id");
@@ -37,7 +36,7 @@ if ($tableId) {
 
     echo json_encode([
         'success' => false,
-        'message' => 'Invalid table ID'
+        'message' => 'Invalid or missing table ID'
     ]);
 }
 ?>

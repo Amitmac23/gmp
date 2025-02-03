@@ -110,7 +110,7 @@
                         <a class="nav-link" href="http://localhost/gmp/admin/player_history.php">Player History</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="http://localhost/gmp/admin/advance_booking.php">Advance Booking</a>
+                        <a class="nav-link" href="http://localhost/gmp/admin/manage_table_games.php">Assign Table</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="http://localhost/gmp/admin/reports.php">Reports</a>

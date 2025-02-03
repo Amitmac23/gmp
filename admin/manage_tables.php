@@ -58,7 +58,6 @@ if (isset($_POST['add_table'])) {
     $game_id = $_POST['game_id'];
     $table_number = $_POST['table_number'];
     $status = 'available'; // Default status
-    $price_per_half_hour = $_POST['price_per_half_hour'];
     $min_capacity = $_POST['min_capacity'];
     $max_capacity = $_POST['max_capacity'];
     $extra_charge = $_POST['extra_charge'];
@@ -72,18 +71,19 @@ if (isset($_POST['add_table'])) {
         if ($count > 0) {
             echo "<div style='color: red; font-weight: bold;'>Error: Table with the same number already exists for this game.</div>";
         } else {
-            // Insert the new table with min_capacity, max_capacity, and extra_charge
+            // Insert the new table without the table_price_per_half_hour
             $stmt = $pdo->prepare("
-                INSERT INTO tables (game_id, table_number, status, price_per_half_hour, min_capacity, max_capacity, extra_charge)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tables (game_id, table_number, status, min_capacity, max_capacity, extra_charge)
+                VALUES (?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$game_id, $table_number, $status, $price_per_half_hour, $min_capacity, $max_capacity, $extra_charge]);
+            $stmt->execute([$game_id, $table_number, $status, $min_capacity, $max_capacity, $extra_charge]);
             echo "<div style='color: green; font-weight: bold;'>Success: Table added successfully.</div>";
         }
     } catch (PDOException $e) {
         echo "<div style='color: red; font-weight: bold;'>Error: " . htmlspecialchars($e->getMessage()) . "</div>";
     }
 }
+
 
 if (isset($_POST['edit_table'])) {
     // Ensure the input matches the field names

@@ -91,7 +91,7 @@ try {
     <a href="javascript:history.back()" class="btn btn-secondary mb-3">
         <i class="fas fa-arrow-left"></i> Back
     </a>
-        <h1 class="text-center mb-5">Our Games</h1>
+        <h1 class="text-center mb-5">Games</h1>
 
         <div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-4">
     <?php foreach ($games as $game): ?>

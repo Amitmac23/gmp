@@ -11,18 +11,20 @@ if (!$table_id) {
     exit;
 }
 
-// Fetch game_id, price_per_half_hour, table_number, and status from the tables table based on the table_id
+// Fetch the game_id, price_per_half_hour, table_number, status, min_capacity, max_capacity, and extra_charge from the tables table
+// and join with the table_game table to get the game_id
 $stmt = $pdo->prepare("
     SELECT 
-        game_id, 
-        price_per_half_hour, 
-        table_number, 
-        status, 
-        min_capacity, 
-        max_capacity, 
-        extra_charge 
-    FROM tables 
-    WHERE id = :id
+        tg.game_id, 
+        t.price_per_half_hour, 
+        t.table_number, 
+        t.status, 
+        t.min_capacity, 
+        t.max_capacity, 
+        t.extra_charge
+    FROM tables t
+    LEFT JOIN table_game tg ON t.id = tg.table_id
+    WHERE t.id = :id
 ");
 $stmt->execute(['id' => $table_id]);
 $table = $stmt->fetch();
@@ -49,16 +51,35 @@ if ($table['status'] === 'booked') {
             <p style='color: #6c757d;'>This table has already been booked. Please select a different table.</p>
         </div>
     </div>";
-        exit;
+    exit;
 }
 
-
-
-$game_id = $table['game_id']; // Get the game_id from the table
+$game_id = $table['game_id']; // Get the game_id from the table_game relationship table
 $price_per_half_hour = $table['price_per_half_hour']; // Get the price per half-hour
 $min_capacity = $table['min_capacity']; // Get the min capacity
 $max_capacity = $table['max_capacity']; // Get the max capacity
 $extra_charge = $table['extra_charge']; // Get the extra charge per player
+
+// Fetch game details including price_per_half_hour, has_frame, and frame_price from the games table
+$stmt = $pdo->prepare("
+    SELECT g.price_per_half_hour, g.has_frame, g.frame_price
+    FROM games g
+    WHERE g.id = :game_id
+");
+$stmt->execute(['game_id' => $game_id]);
+$game = $stmt->fetch();
+
+// Check if the game exists
+if (!$game) {
+    echo "Game details not found.";
+    exit;
+}
+
+// Extract values
+$has_frame = $game['has_frame']; // Whether the game supports a frame
+$price_per_half_hour = $game['price_per_half_hour']; // Price per half-hour
+$frame_price = $game['frame_price']; // Price for the frame
+
 
 // Retrieve form data (customer details)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -74,24 +95,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $start_time = new DateTime($start_time_input, new DateTimeZone('Asia/Kolkata'));
         $start_time_formatted = $start_time->format('Y-m-d H:i:s');
 
-        // Calculate end time
-        $end_time = clone $start_time;
-        $end_time->modify('+' . $duration . ' minutes');
-        $end_time_formatted = $end_time->format('Y-m-d H:i:s');
-
-        // Validate player count
-        if ($player_count < $min_capacity || $player_count > $max_capacity) {
-            echo "Player count must be between $min_capacity and $max_capacity.";
-            exit;
+        // If frame is selected, skip duration and exit time logic
+        if ($duration === 'frame') {
+            $end_time_formatted = null;
+            $duration = null;  // Don't insert duration in the database
+        } else {
+            // Calculate end time based on the duration if it's not a frame
+            $end_time = clone $start_time;
+            $end_time->modify('+' . $duration . ' minutes');
+            $end_time_formatted = $end_time->format('Y-m-d H:i:s');
         }
 
-        // Calculate total price based on the duration, price per half-hour, and extra charge
-        $total_price = ($price_per_half_hour * ($duration / 60)); // Base price for the duration
-        if ($player_count > $min_capacity) {
-            // Calculate extra charge for additional players
-            $extra_players = $player_count - $min_capacity;
-            $total_price += $extra_players * $extra_charge; // Add extra charge for the extra players
-        }
+
+     if ($duration === null || $duration === 'frame') {
+    // Handle frame case
+    $total_price = $frame_price; // Use frame price
+    if ($player_count > $min_capacity) {
+        // Calculate extra charge for additional players
+        $extra_players = $player_count - $min_capacity;
+        $total_price += $extra_players * $extra_charge; // Add extra charge for the extra players
+    }
+
+    // Update the frame column in the bookings table
+    $stmt = $pdo->prepare("UPDATE bookings SET frame = 1 WHERE id = :table_id");
+    $stmt->execute(['table_id' => $table_id]);
+} else {
+    // Calculate total price based on the duration, price per half-hour, and extra charge
+    $total_price = ($price_per_half_hour * ($duration / 60)); // Base price for the duration
+    if ($player_count > $min_capacity) {
+        // Calculate extra charge for additional players
+        $extra_players = $player_count - $min_capacity;
+        $total_price += $extra_players * $extra_charge; // Add extra charge for the extra players
+    }
+}
+
 
         // Check if the customer already exists
         $stmt = $pdo->prepare("SELECT id FROM customers WHERE name = :name AND phone = :phone");
@@ -108,9 +145,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $customer_id = $pdo->lastInsertId();
         }
 
-        // Insert booking information into the bookings table
-        $stmt = $pdo->prepare("INSERT INTO bookings (table_id, game_id, customer_id, start_time, duration, end_time, total_price, player_count)
-                               VALUES (:table_id, :game_id, :customer_id, :start_time, :duration, :end_time, :total_price, :player_count)");
+        // Insert booking details
+        $stmt = $pdo->prepare("
+            INSERT INTO bookings (table_id, game_id, customer_id, start_time, duration, end_time, total_price, player_count, frame)
+            VALUES (:table_id, :game_id, :customer_id, :start_time, :duration, :end_time, :total_price, :player_count, :frame)
+        ");
         $stmt->execute([
             'table_id' => $table_id,
             'game_id' => $game_id,
@@ -119,7 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'duration' => $duration,
             'end_time' => $end_time_formatted,
             'total_price' => $total_price,
-            'player_count' => $player_count
+            'player_count' => $player_count,
+            'frame' => $duration === null ? 1 : 0
         ]);
 
         // Update table status to "booked"
@@ -138,7 +178,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // error_log($e->getMessage());
     }
 }
+
 ?>
+
 
 
 <!DOCTYPE html>
@@ -273,49 +315,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <body>
     <div class="container">
-        <h3 class="card-header">Register for Table <?= $table['table_number'] ?></h3>
-        <div class="form-container">
-            <form method="POST" action="">
-                <label for="name" class="form-label">Customer Name:</label>
-                <input type="text" name="name" id="name" class="form-control" required>
+    <h3 class="card-header">Register for Table <?= $table['table_number'] ?></h3>
+    <div class="form-container">
+        <form method="POST" action="">
+            <label for="name" class="form-label">Customer Name:</label>
+            <input type="text" name="name" id="name" class="form-control" required>
 
-                <label for="phone" class="form-label">Phone Number:</label>
-                <input type="text" name="phone" id="phone" class="form-control" required 
-                       maxlength="10" pattern="\d{10}" title="Enter a valid 10-digit phone number">
+            <label for="phone" class="form-label">Phone Number:</label>
+            <input type="text" name="phone" id="phone" class="form-control" required 
+                   maxlength="10" pattern="\d{10}" title="Enter a valid 10-digit phone number">
 
+            <label for="start_time" class="form-label">Start Time:</label>
+            <select name="start_time" id="start_time" class="form-control" required></select>
 
-                <label for="start_time" class="form-label">Start Time:</label>
-                <select name="start_time" id="start_time" class="form-control" required></select>
+            <label for="duration" class="form-label">Duration:</label>
+            <select name="duration" id="duration" class="form-control" required>
+                <option value="30">30 Minutes</option>
+                <option value="60">1 Hour</option>
+                <option value="90">1.5 Hours</option>
+                <option value="120">2 Hours</option>
 
-                <label for="duration" class="form-label">Duration:</label>
-                <select name="duration" id="duration" class="form-control" required>
-                    <option value="30">30 Minutes</option>
-                    <option value="60">1 Hour</option>
-                    <option value="90">1.5 Hours</option>
-                    <option value="120">2 Hours</option>
-                </select>
-
-                <div class="mt-3">
-                    <label for="player_count" class="form-label">Player Count:</label>
-                    <div class="input-group">
-                        <button type="button" id="decreasePlayer">-</button>
-                        <input type="text" id="player_count" value="1" readonly>
-                        <button type="button" id="increasePlayer">+</button>
-                    </div>
+                <?php if ($has_frame === 'yes'): ?>
+                <option value="frame">Frame</option>
+            <?php endif; ?>
+            </select>
+         <div class="mt-3">
+                <label for="player_count" class="form-label">Player Count:</label>
+                <div class="input-group">
+                    <button type="button" id="decreasePlayer">-</button>
+                    <input type="text" id="player_count" name="player_count" value="1" readonly>
+                    <button type="button" id="increasePlayer">+</button>
                 </div>
+            </div>
 
-                <label for="end_time" class="form-label">Exit Time:</label>
-                <input type="text" name="end_time" id="end_time" class="form-control" readonly>
+            <label for="end_time" class="form-label">Exit Time:</label>
+            <input type="text" name="end_time" id="end_time" class="form-control" readonly>
 
-                <label for="total_price" class="form-label">Total Price:</label>
-                <input type="text" name="total_price" id="total_price" class="form-control" readonly>
+            <label for="total_price" class="form-label">Total Price:</label>
+            <input type="text" name="total_price" id="total_price" class="form-control" readonly>
 
-                <button type="submit" class="btn">Confirm Booking</button>
-            </form>
-
-        </div>
+            <button type="submit" class="btn">Confirm Booking</button>
+        </form>
     </div>
-
+</div>
   <script>
 document.addEventListener('DOMContentLoaded', () => {
     const timeSelect = document.getElementById('start_time');
@@ -331,20 +373,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const maxCapacity = <?php echo $max_capacity; ?>;
     const extraChargePerPlayer = <?php echo $extra_charge; ?>;
     const pricePerHalfHour = <?php echo $price_per_half_hour; ?>;
+    const framePrice = <?php echo $frame_price; ?>; // Add frame price
 
     // Fetch current time and add 5 minutes
     const currentTime = new Date();
-    currentTime.setMinutes(currentTime.getMinutes() + 5); // Start from current time + 5 minutes
-    currentTime.setSeconds(0); // Set seconds to 0 to match the start time format
+    currentTime.setMinutes(currentTime.getMinutes() + 5);
+    currentTime.setSeconds(0);
 
-    // Add a single option for the current time + 5 minutes
     const indiaTime = new Date(currentTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     const option = document.createElement('option');
     option.value = indiaTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
-    option.textContent = formatTime(indiaTime); // Format the time for display
+    option.textContent = formatTime(indiaTime);
     timeSelect.appendChild(option);
 
-    // Format time to HH:MM AM/PM
     function formatTime(date) {
         const hours = date.getHours();
         const minutes = date.getMinutes();
@@ -354,20 +395,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${formattedHours}:${formattedMinutes} ${ampm}`;
     }
 
-    // Update exit time and total price based on start time, duration, and player count
     function updateDetails() {
         const startTime = new Date(timeSelect.value);
-        startTime.setSeconds(0); // Set seconds to 0 to match the start time format
-        const duration = parseInt(durationInput.value);
+        startTime.setSeconds(0);
+        const duration = durationInput.value;
         const playerCount = parseInt(playerCountInput.value);
 
-        if (isNaN(startTime) || isNaN(duration) || isNaN(playerCount)) {
+        if (isNaN(startTime) || isNaN(playerCount)) {
             alert('Please ensure all inputs are valid.');
-            return;
-        }
-
-        if (duration <= 0) {
-            alert('Duration must be greater than 0 minutes.');
             return;
         }
 
@@ -376,22 +411,40 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Handle "Frame" selection
+        if (duration === 'frame') {
+            endTimeInput.value = 'Full Game'; // Show "Full Game" as end time
+            let totalPrice = framePrice; // Use frame price
+            if (playerCount > minCapacity) {
+                const extraPlayers = playerCount - minCapacity;
+                totalPrice += extraPlayers * extraChargePerPlayer; // Add extra charges for additional players
+            }
+            totalPriceInput.value = totalPrice.toFixed(2); // Update total price
+            return;
+        }
+
+        const durationMinutes = parseInt(duration);
+        if (isNaN(durationMinutes) || durationMinutes <= 0) {
+            alert('Duration must be greater than 0 minutes.');
+            return;
+        }
+
         const exitTime = new Date(startTime);
-        exitTime.setMinutes(exitTime.getMinutes() + duration);
+        exitTime.setMinutes(exitTime.getMinutes() + durationMinutes);
 
         const closingTime = new Date();
-        closingTime.setHours(19, 0, 0); // Closing time: 7:00 PM
+        closingTime.setHours(24, 0, 0); // Closing time: 7:00 PM
 
         if (exitTime <= closingTime) {
             endTimeInput.value = formatTime(exitTime);
 
             // Calculate the base price based on duration and price per half hour
-            let totalPrice = (duration / 60) * pricePerHalfHour;
+            let totalPrice = (durationMinutes / 60) * pricePerHalfHour;
 
             // Apply extra charge for each player exceeding the minimum capacity
             if (playerCount > minCapacity) {
                 const extraPlayers = playerCount - minCapacity;
-                totalPrice += extraPlayers * extraChargePerPlayer; // Extra charge per exceeding player
+                totalPrice += extraPlayers * extraChargePerPlayer;
             }
 
             totalPriceInput.value = totalPrice.toFixed(2);
@@ -401,33 +454,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Increment player count
     increasePlayer.addEventListener('click', () => {
         let currentCount = parseInt(playerCountInput.value);
-        if (currentCount < maxCapacity) { // Ensure player count does not exceed maxCapacity
+        if (currentCount < maxCapacity) {
             playerCountInput.value = currentCount + 1;
-            updateDetails(); // Update details after increment
+            updateDetails();
         } else {
             alert(`Player count cannot exceed ${maxCapacity}.`);
         }
     });
 
-    // Decrement player count
     decreasePlayer.addEventListener('click', () => {
         let currentCount = parseInt(playerCountInput.value);
-        if (currentCount > 1) { // Allow decrement to 1 or above
+        if (currentCount > 1) {
             playerCountInput.value = currentCount - 1;
-            updateDetails(); // Update details after decrement
+            updateDetails();
         }
     });
 
-    // Add event listeners for start time and duration input
     timeSelect.addEventListener('change', updateDetails);
     durationInput.addEventListener('input', updateDetails);
 
-    // Initialize values
     updateDetails();
 });
+
 
 </script>
 </body>

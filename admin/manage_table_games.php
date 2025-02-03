@@ -1,4 +1,13 @@
 <?php
+
+session_start();
+
+// Ensure the user is logged in as an admin
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header("Location: admin_login.php"); // Redirect to admin login if not authenticated
+    exit;
+}
+
 // Include the database connection
 require_once '../config/config.php';
 

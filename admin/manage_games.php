@@ -11,12 +11,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 // Database connection
 require_once '../config/config.php';
 
-// Check if the form is submitted
+// Check if the form is submitted for adding a game
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_game'])) {
     $name = $_POST['name'];
     $game_description = $_POST['game_description'];
     $game_image = $_FILES['game_image']['name'];
     $price_per_half_hour = $_POST['price_per_half_hour'];
+    $has_frame = $_POST['has_frame'];
+    $frame_price = ($has_frame === 'yes') ? floatval($_POST['frame_price']) : null; // Frame price if applicable
 
     if (empty($name)) {
         echo '<div class="alert alert-danger">Game name is required!</div>';
@@ -28,19 +30,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_game'])) {
 
         if (in_array($image_extension, $allowed_extensions)) {
             if (move_uploaded_file($_FILES['game_image']['tmp_name'], $upload_file)) {
-                $stmt = $pdo->prepare("INSERT INTO games (name, game_description, game_image, price_per_half_hour) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$name, $game_description, $game_image, $price_per_half_hour]);
+                $stmt = $pdo->prepare("INSERT INTO games (name, game_description, game_image, price_per_half_hour, has_frame, frame_price) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$name, $game_description, $game_image, $price_per_half_hour, $has_frame, $frame_price]);
 
                 echo '<div class="alert alert-success">Game added successfully!</div>';
             } else {
                 echo '<div class="alert alert-danger">Failed to upload image!</div>';
             }
         } else {
-            echo '<div class="alert alert-danger">Invalid image format. Only JPG, JPEG, PNG, and GIF are allowed.</div>';
+            echo '<div class="alert alert-danger">Invalid image format. Only JPG, JPEG, PNG, GIF, and WEBP are allowed.</div>';
         }
     }
 }
-
 
 // Check if the form is submitted for editing a game
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_game'])) {
@@ -48,6 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_game'])) {
     $name = htmlspecialchars($_POST['game_name']);
     $game_description = htmlspecialchars($_POST['game_description']);
     $price_per_half_hour = floatval($_POST['price_per_half_hour']); // Ensure it's a valid number
+    $has_frame = $_POST['has_frame'];
+    $frame_price = ($has_frame === 'yes') ? floatval($_POST['frame_price']) : null; // Frame price if applicable
 
     if (empty($name)) {
         echo '<div class="alert alert-danger">Game name is required!</div>';
@@ -61,8 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_game'])) {
 
             if (in_array($image_extension, $allowed_extensions)) {
                 if (move_uploaded_file($_FILES['game_image']['tmp_name'], $upload_file)) {
-                    $stmt = $pdo->prepare("UPDATE games SET name = ?, game_description = ?, game_image = ?, price_per_half_hour = ? WHERE id = ?");
-                    $stmt->execute([$name, $game_description, $game_image, $price_per_half_hour, $game_id]);
+                    $stmt = $pdo->prepare("
+                        UPDATE games 
+                        SET name = ?, game_description = ?, game_image = ?, price_per_half_hour = ?, has_frame = ?, frame_price = ? 
+                        WHERE id = ?");
+                    $stmt->execute([$name, $game_description, $game_image, $price_per_half_hour, $has_frame, $frame_price, $game_id]);
 
                     echo '<div class="alert alert-success">Game updated successfully!</div>';
                     header("Location: manage_games.php"); // Redirect to the game list page
@@ -75,8 +81,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_game'])) {
             }
         } else {
             // If no image is uploaded, update without changing the image
-            $stmt = $pdo->prepare("UPDATE games SET name = ?, game_description = ?, price_per_half_hour = ? WHERE id = ?");
-            $stmt->execute([$name, $game_description, $price_per_half_hour, $game_id]);
+            $stmt = $pdo->prepare("
+                UPDATE games 
+                SET name = ?, game_description = ?, price_per_half_hour = ?, has_frame = ?, frame_price = ? 
+                WHERE id = ?");
+            $stmt->execute([$name, $game_description, $price_per_half_hour, $has_frame, $frame_price, $game_id]);
 
             echo '<div class="alert alert-success">Game updated successfully!</div>';
             header("Location: manage_games.php"); // Redirect to the game list page
@@ -84,8 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_game'])) {
         }
     }
 }
-
-
 
 // Check if the delete_game button is clicked
 if (isset($_POST['delete_game'])) {
@@ -206,7 +213,7 @@ $games = $stmt->fetchAll();
     <a href="javascript:history.back()" class="btn btn-secondary mb-3">
         <i class="fas fa-arrow-left"></i> Back
     </a>
-    <h1 class="text-center mb-5">Manage Games</h1>
+    <h1 class="text-center">Manage Games</h1>
 
     <!-- Button to trigger add game modal -->
     <div class="text-center">
@@ -277,9 +284,26 @@ $games = $stmt->fetchAll();
                         <textarea class="form-control" name="game_description"></textarea>
                     </div>
                     <div class="mb-3">
-                    <label for="price_per_half_hour" class="form-label">Price Per Hour</label>
-                    <input type="number" class="form-control" name="price_per_half_hour" value="" step="1" required>
-                     </div>
+                        <label for="price_per_half_hour" class="form-label">Price Per Hour</label>
+                        <input type="number" class="form-control" name="price_per_half_hour" value="" step="1" required>
+                    </div>
+
+                    <!-- Frame Option -->
+                    <div class="mb-3">
+                        <label class="form-label">Does this game have a frame?</label>
+                        <div>
+                            <input type="radio" name="has_frame" value="yes" id="frameYes" onclick="toggleFrameOption(true)" required>
+                            <label for="frameYes">Yes</label>
+                            <input type="radio" name="has_frame" value="no" id="frameNo" onclick="toggleFrameOption(false)" required>
+                            <label for="frameNo">No</label>
+                        </div>
+                    </div>
+
+                    <!-- Frame Price (Initially Hidden) -->
+                    <div class="mb-3" id="framePriceContainer" style="display: none;">
+                        <label for="frame_price" class="form-label">Frame Price</label>
+                        <input type="number" class="form-control" name="frame_price" step="1">
+                    </div>
 
                     <div class="mb-3">
                         <label for="game_image" class="form-label">Game Image</label>
@@ -375,6 +399,16 @@ $games = $stmt->fetchAll();
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 <script>
     AOS.init();
+
+    function toggleFrameOption(show) {
+        const framePriceContainer = document.getElementById('framePriceContainer');
+        if (show) {
+            framePriceContainer.style.display = 'block';
+        } else {
+            framePriceContainer.style.display = 'none';
+            framePriceContainer.querySelector('input').value = ''; // Clear the input
+        }
+    }
 </script>
 
 <!-- Bootstrap JS -->

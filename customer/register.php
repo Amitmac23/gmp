@@ -136,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <input type="text" id="phone" name="phone" class="form-control" maxlength="10" required 
                     pattern="\d{10}" title="Please enter exactly 10 digits">
             </div>
-            <button type="submit" class="btn">Start Your Journey</button>
+            <button type="submit" class="btn">Start Your Game</button>
         </form>
     </div>
 </body>

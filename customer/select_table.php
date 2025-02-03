@@ -20,9 +20,10 @@ $game = $gameStmt->fetch(PDO::FETCH_ASSOC);
 if (!$game) {
     die("Game not found.");
 }
-
+$has_frame = $game['has_frame'];
 // Add the price_per_half_hour from the games table to display later
 $game_price_per_half_hour = $game['price_per_half_hour'];
+$frame_price = $game['frame_price'];
 
 // Fetch tables associated with the selected game
 $stmt = $pdo->prepare("SELECT * FROM tables WHERE game_id = ?");
@@ -70,7 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $table_id = $_POST['table_id']; // Get table ID from the form
     $start_time = $_POST['start_time'];  // Start time from the form
     $duration = $_POST['duration'];  // Duration in minutes
-    $players_count = $_POST['players_count']; // Number of players from the form
+    $player_count = isset($_POST['player_count']) ? (int)$_POST['player_count'] : $min_capacity;
+
 
     // Convert start time to DateTime object
     $startTime = new DateTime($start_time, new DateTimeZone('Asia/Kolkata'));
@@ -96,18 +98,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $table_price_per_half_hour = $selectedTable['price_per_half_hour'];
 
     // Calculate the total price
-    $total_price = $table_price_per_half_hour * $duration * $players_count;
+    $total_price = $table_price_per_half_hour * $duration * $player_count;
 
     // Apply extra charge if the number of players exceeds min_cap
-    if ($players_count > $min_cap) {
-        $extra_players = $players_count - $min_cap;
+    if ($player_count > $min_cap) {
+        $extra_players = $player_count - $min_cap;
         $total_price += $extra_players * $extra_charge; // Apply extra charge for exceeding players
     }
 
+
     // Insert booking into the bookings table (including game_id)
     try {
-        $stmt = $pdo->prepare("INSERT INTO bookings (table_id, customer_id, game_id, start_time, end_time, duration, total_price, players_count)
-                               VALUES (:table_id, :customer_id, :game_id, :start_time, :end_time, :duration, :total_price, :players_count)");
+        $stmt = $pdo->prepare("INSERT INTO bookings (table_id, customer_id, game_id, start_time, end_time, duration, total_price, player_count)
+                               VALUES (:table_id, :customer_id, :game_id, :start_time, :end_time, :duration, :total_price, :player_count)");
         $stmt->execute([
             'table_id' => $table_id,
             'customer_id' => $_SESSION['customer_id'],  // Using session customer ID
@@ -116,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'end_time' => $end_time_formatted,
             'duration' => $duration,
             'total_price' => $total_price,
-            'players_count' => $players_count
+            'player_count' => $player_count
         ]);
 
         // Redirect to success page after booking
@@ -126,8 +129,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Error: " . $e->getMessage());
     }
 }
-
-
 
 // Get the bookings for each table
 $query = "
@@ -146,10 +147,7 @@ foreach ($tables as $table) {
     $booking = $stmt->fetch();
 }
 
-
 ?>
-
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -232,18 +230,28 @@ foreach ($tables as $table) {
                             $end_time = $booking['end_time'];
                             $customer_name = $booking['customer_name'];
                             $total_price = $booking['total_price']; // Fetch total price from the booking table
+                            $frame = $booking['frame']; // Get the frame value
                         } else {
                             $start_time = $end_time = $customer_name = $total_price = 'N/A';
+                            $frame = 0; // Default to 0 if no booking
                         }
                         ?>
                         <p><strong>Booking By:</strong> <?= htmlspecialchars($customer_name) ?></p>
                         <p><strong>Start Time:</strong> <?= date('h:i A', strtotime($start_time)) ?></p>
-                        <p><strong>End Time:</strong> <?= date('h:i A', strtotime($end_time)) ?></p>
+
+                        <?php if ($frame == 1): ?>
+                            
+                        <?php else: ?>
+                            <p><strong>End Time:</strong> <?= date('h:i A', strtotime($end_time)) ?></p>
+                        <?php endif; ?>
+
                         <p><strong>Time Remaining:</strong> 
                             <span id="timer-<?= $table['table_id'] ?>" 
-                                  data-end-time="<?= date('Y-m-d H:i:s', strtotime($end_time)) ?>"
-                                  data-start-time="<?= date('Y-m-d H:i:s', strtotime($start_time)) ?>">Waiting to start</span>
+                                  data-end-time="<?= date('Y-m-d H:i:s', strtotime($end_time)) ?>" 
+                                  data-start-time="<?= date('Y-m-d H:i:s', strtotime($start_time)) ?>"
+                                  data-frame="<?= htmlspecialchars($frame) ?>">Waiting to start</span>
                         </p>
+
                         <p><strong>Total Price:</strong> 
                             <span id="total-price-<?= $table['table_id'] ?>"><?= htmlspecialchars($total_price) ?></span>
                         </p>
@@ -276,12 +284,15 @@ foreach ($tables as $table) {
                     <option value="1">1 Hour</option>
                     <option value="1.5">1.5 Hours</option>
                     <option value="2">2 Hours</option>
+                    <?php if ($has_frame === 'yes'): ?>
+                        <option value="frame">Frame</option>
+                    <?php endif; ?>
                 </select>
                 <div class="mt-3">
                     <label for="player_count" class="form-label">Player Count:</label>
                     <div class="input-group">
                         <button class="btn btn-outline-secondary" type="button" id="decreasePlayer">-</button>
-                        <input type="text" id="player_count" class="form-control text-center" value="1" readonly>
+                        <input type="text" id="player_count" name="player_count" class="form-control text-center" value="1" readonly>
                         <button class="btn btn-outline-secondary" type="button" id="increasePlayer">+</button>
                     </div>
                 </div>
@@ -305,6 +316,8 @@ foreach ($tables as $table) {
         </div>
     </div>
 </div>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const timeSelect = document.getElementById('start_time');
@@ -320,6 +333,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let minPlayers = 2; // Default minimum players (you can fetch this from the database)
     let maxPlayers = 6; // Default maximum players (you can fetch this from the database)
     let extraChargePerPlayer = 10; // Default extra charge per player (you can fetch this from the database)
+    let framePrice = <?php echo $frame_price; ?>; // Add frame price
 
     // Utility function to format time in HH:mm AM/PM format
     function formatTime(date) {
@@ -368,30 +382,70 @@ document.addEventListener('DOMContentLoaded', function () {
         button.addEventListener('click', handleTableSelection);
     });
 
-    // Update total price based on number of players and duration
-    function updateTotalPrice() {
-        const selectedStartTime = timeSelect.value;
-        const selectedDuration = parseFloat(durationElement.value || 0);
-        const selectedPlayers = parseInt(playerCountInput.value);
+function updateTotalPrice() {
+    const selectedStartTime = timeSelect.value;
+    const selectedDuration = durationElement.value;
+    const selectedPlayers = parseInt(playerCountInput.value);
 
-        if (selectedDuration <= 0 || isNaN(selectedDuration)) {
-            totalPriceElement.value = '0.00';
-            exitTimeElement.value = 'Invalid Duration';
-            return;
-        }
+    // If no start time or duration is selected, show default values
+    if (!selectedStartTime || !selectedDuration) {
+        totalPriceElement.value = '0.00';
+        exitTimeElement.value = 'Invalid Input';
+        return;
+    }
 
-        let totalPrice = tablePricePerHalfHour * selectedDuration;
+    // Handle the "frame" option
+    if (selectedDuration === 'frame') {
+        let totalPrice = framePrice;
 
-        // Apply extra charge if players exceed the minimum capacity
+        // Add extra charges for players exceeding minimum
         if (selectedPlayers > minPlayers) {
             const extraPlayers = selectedPlayers - minPlayers;
             totalPrice += extraPlayers * extraChargePerPlayer;
         }
 
-        totalPriceElement.value = totalPrice.toFixed(2);
+        totalPriceElement.value = totalPrice.toFixed(2); // Use the frame price with extra charges
+        exitTimeElement.value = 'Full Game';
+        return;
     }
 
-    // Decrease player count
+    const durationInHours = parseFloat(selectedDuration || 0);
+
+    // Validate duration
+    if (durationInHours <= 0 || isNaN(durationInHours)) {
+        totalPriceElement.value = '0.00';
+        exitTimeElement.value = 'Invalid Duration';
+        return;
+    }
+
+    // Calculate total price
+    let totalPrice = tablePricePerHalfHour * durationInHours;
+
+    // Add extra charges for players exceeding minimum
+    if (selectedPlayers > minPlayers) {
+        const extraPlayers = selectedPlayers - minPlayers;
+        totalPrice += extraPlayers * extraChargePerPlayer;
+    }
+
+    totalPriceElement.value = totalPrice.toFixed(2);
+
+    // Calculate and display the exit time
+    const [time, ampm] = selectedStartTime.split(' ');
+    const [hours, minutes] = time.split(':').map(Number);
+
+    let startDate = new Date();
+    startDate.setHours(ampm === 'PM' && hours !== 12 ? hours + 12 : hours);
+    startDate.setMinutes(minutes);
+    startDate.setMinutes(startDate.getMinutes() + (durationInHours * 60));
+
+    exitTimeElement.value = formatTime(startDate);
+}
+
+// Attach event listeners
+durationElement.addEventListener('change', updateTotalPrice);
+timeSelect.addEventListener('change', updateTotalPrice);
+
+    
     decreasePlayerButton.addEventListener('click', function () {
         let currentCount = parseInt(playerCountInput.value);
         if (currentCount > 1) {
@@ -400,8 +454,6 @@ document.addEventListener('DOMContentLoaded', function () {
             updateTotalPrice();
         }
     });
-
-    // Increase player count
     increasePlayerButton.addEventListener('click', function () {
         let currentCount = parseInt(playerCountInput.value);
         if (currentCount < maxPlayers) {
@@ -412,136 +464,109 @@ document.addEventListener('DOMContentLoaded', function () {
             alert(`Maximum capacity of ${maxPlayers} players reached.`);
         }
     });
-
-
-    // Function to update the total price based on the number of players and duration
-    function updateTotalPrice() {
-        const selectedStartTime = timeSelect.value;
-        const selectedDuration = parseFloat(durationElement.value || 0);
-        const selectedPlayers = parseInt(playerCountInput.value);
-
-        if (selectedDuration <= 0 || isNaN(selectedDuration)) {
-            totalPriceElement.value = '0.00';
-            exitTimeElement.value = 'Invalid Duration';
-            return;
-        }
-
-        let totalPrice = tablePricePerHalfHour * selectedDuration;
-
-        // Apply extra charge if players exceed the minimum capacity
-        if (selectedPlayers > minPlayers) {
-            const extraPlayers = selectedPlayers - minPlayers;
-            totalPrice += extraPlayers * extraChargePerPlayer;
-        }
-
-        totalPriceElement.value = totalPrice.toFixed(2);
-
-        // Calculate exit time
-        const [time, ampm] = selectedStartTime.split(' ');
-        const [hours, minutes] = time.split(':').map(Number);
-
-        let startDate = new Date();
-        startDate.setHours(ampm === 'PM' && hours !== 12 ? hours + 12 : hours);
-        startDate.setMinutes(minutes);
-        startDate.setMinutes(startDate.getMinutes() + (selectedDuration * 60));
-
-        exitTimeElement.value = formatTime(startDate);
-    }
-
-    // Attach event listeners for price updates
-    durationElement.addEventListener('change', updateTotalPrice);
-    timeSelect.addEventListener('change', updateTotalPrice);
-
-    // Update total price and exit time based on duration
-    function updateCountdown() {
-    const timers = document.querySelectorAll('[id^="timer-"]'); // Select all elements with ids starting with "timer-"
+function updateCountdown() {
+    const timers = document.querySelectorAll('[id^="timer-"]'); // Select all timer elements
 
     timers.forEach(function (timer) {
         const tableId = timer.closest('[data-table-id]') ? timer.closest('[data-table-id]').getAttribute('data-table-id') : null;
 
-        // Check if tableId is null
         if (!tableId) {
             console.error("Table ID is missing!");
             return;
         }
 
         const endTimeString = timer.getAttribute('data-end-time');
-        const startTimeString = timer.getAttribute('data-start-time'); // Get the start time
+        const startTimeString = timer.getAttribute('data-start-time');
+        const frame = parseInt(timer.getAttribute('data-frame'), 10); // Get frame value
 
-        if (!endTimeString || !startTimeString) {
-            console.error("Start or end time is missing for table ID:", tableId);
+        if (!endTimeString || !startTimeString || isNaN(frame)) {
+            console.error("Start time, end time, or frame value is missing for table ID:", tableId);
             return;
         }
 
-        // Convert the start and end time strings to Unix timestamps
         const startTime = Date.parse(startTimeString) / 1000;
         const endTime = Date.parse(endTimeString) / 1000;
         const now = Math.floor(new Date().getTime() / 1000); // Current time in Unix timestamp (seconds)
 
-        if (now < startTime) {
-            // If current time is before start time, show "Waiting to start"
-            timer.textContent = 'Waiting to start';
-        } else if (now >= startTime && now < endTime) {
-            // If current time is between start time and end time, show the remaining time
-            const remainingTime = endTime - now;
+        if (frame === 1) {
+            // Frame value is 1: Show live timer
+            if (now >= startTime) {
+                const elapsedTime = now - startTime;
 
-            const hours = Math.floor(remainingTime / (60 * 60));
-            const minutes = Math.floor((remainingTime % (60 * 60)) / 60);
-            const seconds = remainingTime % 60;
+                const hours = Math.floor(elapsedTime / (60 * 60));
+                const minutes = Math.floor((elapsedTime % (60 * 60)) / 60);
+                const seconds = elapsedTime % 60;
 
-            // Display the countdown in HH:mm:ss format
-            timer.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        } else {
-            // If the time has passed, show "00:00:00" and update the table status
-            timer.textContent = '00:00:00';
+                timer.textContent = ` ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            } else if (now < startTime) {
+                timer.textContent = "Waiting to start";
+            } else {
+                timer.textContent = "00:00:00";
+            }
+        } else if (frame === 0) {
+            // Frame value is 0: Show reverse countdown
+            if (now >= startTime && now < endTime) {
+                const remainingTime = endTime - now;
 
-            // Send an AJAX request to update the status in the database
-            fetch('update_table_status.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ table_id: tableId }) // Ensure tableId is passed here
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Update the UI to reflect the new status
-                    const tableCard = document.getElementById(`table-card-${tableId}`);
-                    if (tableCard) {
-                        tableCard.classList.remove('booked');
-                        tableCard.classList.add('available');
+                const hours = Math.floor(remainingTime / (60 * 60));
+                const minutes = Math.floor((remainingTime % (60 * 60)) / 60);
+                const seconds = remainingTime % 60;
 
-                        const statusText = tableCard.querySelector('p');
-                        if (statusText) {
-                            statusText.innerHTML = 'Status: <span class="text-success">Available</span>';
+                timer.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            } else if (now < startTime) {
+                timer.textContent = "Waiting to start";
+            } else {
+                timer.textContent = "00:00:00";
+
+                // Timer has ended, update the table status via AJAX
+                fetch('update_table_status.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ table_id: tableId }) // Ensure tableId is passed here
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update the UI to reflect the new status
+                            const tableCard = document.getElementById(`table-card-${tableId}`);
+                            if (tableCard) {
+                                tableCard.classList.remove('booked');
+                                tableCard.classList.add('available');
+
+                                const statusText = tableCard.querySelector('p');
+                                if (statusText) {
+                                    statusText.innerHTML = 'Status: <span class="text-success">Available</span>';
+                                }
+
+                                // Enable the "Book Now" button
+                                const bookButton = tableCard.querySelector('.btn-book');
+                                if (bookButton) {
+                                    bookButton.disabled = false;
+                                }
+                            }
+
+                            // Optionally reload the page to refresh all states
+                            location.reload();
+                        } else {
+                            console.error("Failed to update table status");
                         }
-
-                        // Enable the "Book Now" button
-                        const bookButton = tableCard.querySelector('.btn-book');
-                        if (bookButton) {
-                            bookButton.disabled = false;
-                        }
-                    }
-
-                    // Optionally reload the page to refresh all states
-                    location.reload();
-                } else {
-                    console.error("Failed to update table status");
-                }
-            })
-            .catch(error => {
-                console.error("Error:", error);
-            });
+                    })
+                    .catch(error => {
+                        console.error("Error:", error);
+                    });
+            }
         }
     });
 }
 
-  // Call updateCountdown every second
-    setInterval(updateCountdown, 1000);
+// Call updateCountdown every second
+setInterval(updateCountdown, 1000);
 
-    // Initialize countdown on page load
-    updateCountdown();
+// Initialize countdown on page load
+updateCountdown();
+
 
 // Populate the time dropdown with a single available time
 const currentTime = new Date();
@@ -549,7 +574,7 @@ currentTime.setMinutes(currentTime.getMinutes() + 5); // Start from current time
 currentTime.setSeconds(0); // Set seconds to 0 for consistency
 
 const endTime = new Date();
-endTime.setHours(19, 0, 0); // Closing time: 7:00 PM
+endTime.setHours(24, 0, 0); // Closing time: 7:00 PM
 
 if (currentTime <= endTime) {
     const option = document.createElement('option');
@@ -578,33 +603,47 @@ if (timeSelect.options.length > 0) {
         });
     });
 
-    // Confirm booking functionality
-    document.getElementById('confirmBtn').addEventListener('click', function () {
-        const tableId = this.getAttribute('data-table-id');
-        const gameId = this.getAttribute('data-game-id');  // Retrieve the game_id
-        const startTime = timeSelect.value;
-        const duration = durationElement.value;
-        const totalPrice = totalPriceElement.value;
-        const exitTime = exitTimeElement.value;
+// Confirm booking functionality
+document.getElementById('confirmBtn').addEventListener('click', function () {
+    const tableId = this.getAttribute('data-table-id');
+    const gameId = this.getAttribute('data-game-id');  // Retrieve the game_id
+    const startTime = document.getElementById('start_time').value;  // Assuming you're using 'start_time' as the select field
+    const duration = document.getElementById('duration').value;
+    const totalPrice = document.getElementById('totalPrice').value;
+    const exitTime = document.getElementById('exitTime').value;
+    const playerCount = document.getElementById('player_count').value;  // Get player count
+    
+    // Determine if 'frame' is selected and set the frame value accordingly
+    const frameValue = (duration === 'frame') ? 1 : 0;
 
-        fetch('book_table.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `table_id=${tableId}&game_id=${gameId}&start_time=${startTime}&duration=${duration}&total_price=${totalPrice}&end_time=${exitTime}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert('Table booked successfully!');
-                location.reload();
-
-                const modal = document.getElementById('bookingModal');
-                modal.style.display = 'none';  // Or use a modal close function if you're using a framework
-            } else {
-                alert('Booking failed. Try again.');
-            }
-        });
+    // Perform the booking via a POST request
+    fetch('book_table.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `table_id=${tableId}&game_id=${gameId}&start_time=${startTime}&duration=${duration}&total_price=${totalPrice}&end_time=${exitTime}&player_count=${playerCount}&frame=${frameValue}`  // Send frame value as part of the request
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // Use SweetAlert to show success message
+            Swal.fire({
+                title: 'Success!',
+                text: 'Table booked successfully!',
+                icon: 'success',
+                confirmButtonText: 'OK'
+            }).then(() => {
+                location.reload();  // Refresh to show the updated table status
+            });
+        } else {
+            Swal.fire({
+                title: 'Error!',
+                text: 'Booking failed. Try again.',
+                icon: 'error',
+                confirmButtonText: 'OK'
+            });
+        }
     });
+});
 
    
 });
