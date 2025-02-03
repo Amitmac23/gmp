@@ -333,7 +333,7 @@ $pendingPayments = fetchPendingPayments();
     </div>
 </div>
 <div class="container mt-5">
-    <h5>Pending Payments by amit</h5>
+    <h5>Pending Payments</h5>
     <div class="row">
         <?php foreach ($pendingPayments as $payment): ?>
             <div class="col-md-3 mb-3">
