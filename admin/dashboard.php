@@ -93,6 +93,11 @@ $pendingPayments = fetchPendingPayments();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- SweetAlert CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.min.css">
+
+<!-- SweetAlert JS -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.all.min.js"></script>
     <title>Dashboard - Manage Tables</title>
     <style>
         body {
@@ -399,63 +404,98 @@ $pendingPayments = fetchPendingPayments();
 
 <script>
 function cancelBooking(tableId) {
-    console.log("Cancelling booking for table #" + tableId); // Log tableId
+    Swal.fire({
+        title: 'Cancel Booking',
+        text: 'Are you sure you want to cancel the booking for Table #' + tableId + '?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes',
+        cancelButtonText: 'No'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "cancel_booking.php", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 
-    const confirmation = confirm("Are you sure you want to cancel the booking for Table #" + tableId + "?");
-
-    if (confirmation) {
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", "cancel_booking.php", true);
-        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4 && xhr.status == 200) {
-                var response = JSON.parse(xhr.responseText);
-                if (response.success) {
-                    alert("Booking for table #" + tableId + " has been canceled.");
-                    location.reload();
-                } else {
-                    alert("Failed to cancel booking: " + response.message);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var response = JSON.parse(xhr.responseText);
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success',
+                            text: 'Booking for table #' + tableId + ' has been canceled.'
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Failed to cancel booking: ' + response.message
+                        });
+                    }
                 }
-            }
-        };
+            };
 
-        // Ensure table_id is being sent
-        xhr.send("table_id=" + tableId);
-    }
+            xhr.send("table_id=" + tableId);
+        }
+    });
 }
 
 function endBooking(tableId) {
     console.log("End booking function called for table #" + tableId); // Debug log
 
-    if (confirm("Are you sure you want to end the booking for table #" + tableId + "?")) {
-        console.log("User  confirmed ending the booking."); // Debug log
+    Swal.fire({
+        title: 'End Booking',
+        text: 'Are you sure you want to end the booking for Table #' + tableId + '?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes',
+        cancelButtonText: 'No'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            console.log("User confirmed ending the booking."); // Debug log
 
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", "end_booking.php", true);
-        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "end_booking.php", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4) {
-                console.log("Response received from server:", xhr.responseText); // Log the response
-                if (xhr.status == 200) {
-                    var response = JSON.parse(xhr.responseText);
-                    if (response.success) {
-                        alert("Booking for table #" + tableId + " has been ended.");
-                        location.reload(); // Optionally reload the page or update the UI
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    console.log("Response received from server:", xhr.responseText); // Log the response
+                    if (xhr.status == 200) {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Success',
+                                text: 'Booking for table #' + tableId + ' has been ended.'
+                            }).then(() => {
+                                location.reload(); // Optionally reload the page or update the UI
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: 'Failed to end booking: ' + response.message
+                            });
+                        }
                     } else {
-                        alert("Failed to end booking: " + response.message);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Error: ' + xhr.status
+                        });
                     }
-                } else {
-                    alert("Error: " + xhr.status);
                 }
-            }
-        };
+            };
 
-        xhr.send("table_id=" + tableId); // Send table ID to backend
-    } else {
-        console.log("User  canceled the action."); // Debug log
-    }
+            xhr.send("table_id=" + tableId); // Send table ID to backend
+        } else {
+            console.log("User canceled the action."); // Debug log
+        }
+    });
 }
 
 // function addExtraTime(tableId) {
@@ -475,13 +515,26 @@ function processPayment(tableId, paymentMethod, bookingId) {
         if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
             var response = JSON.parse(xhr.responseText);
             if (response.success) {
-                alert("Payment processed successfully as " + paymentMethod);
-                
-                // Optionally, you can refresh the pending payments or update the UI
-                location.reload(); // Reload the page to reflect changes
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: 'Payment processed successfully as ' + paymentMethod
+                }).then(() => {
+                    location.reload(); // Reload the page to reflect changes
+                });
             } else {
-                alert("Failed to process payment: " + response.message);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Failed to process payment: ' + response.message
+                });
             }
+        } else if (xhr.status !== 200) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Error: ' + xhr.status
+            });
         }
         console.log('tableId', bookingId);
     };
@@ -526,17 +579,28 @@ function updateTimer(startTime, endTime, frame, timerId, tableId) {
     const parsedStartTime = new Date(startTime);
     const parsedEndTime = new Date(endTime);
 
-    // Check if the current time is less than the start time
-    if (currentTime < parsedStartTime) {
-        timerElement.textContent = "Waiting to Start"; // Show waiting message
-        return; // Exit the function
-    }
-
-    // If the current time is past the start time, start the timer
-    if (frame === 1) {
-        updateLiveTimer(startTime, timerId);
+    // Check if the current time is past the start time
+    if (currentTime >= parsedStartTime) {
+        // Start the countdown or timer immediately
+        if (frame === 1) {
+            updateLiveTimer(startTime, timerId);
+        } else {
+            updateCountdown(endTime, timerId, tableId);
+        }
     } else {
-        updateCountdown(endTime, timerId, tableId);
+        // Show "Waiting to Start" until the start time is reached
+        timerElement.textContent = "Waiting to Start";
+        const interval = setInterval(() => {
+            const currentTime = new Date();
+            if (currentTime >= parsedStartTime) {
+                clearInterval(interval);
+                if (frame === 1) {
+                    updateLiveTimer(startTime, timerId);
+                } else {
+                    updateCountdown(endTime, timerId, tableId);
+                }
+            }
+        }, 1000); // Check every second
     }
 }
 
@@ -842,13 +906,21 @@ document.querySelectorAll("[id^='confirmBtn-']").forEach(button => {
         }
 
         if (!selectedGame) {
-            alert("Please select a game.");
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Please select a game.'
+            });
             return;
         }
 
         // Check if customer name or phone is empty
         if (!customerName || !customerPhone) {
-            alert("Please enter both customer name and phone.");
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Please enter both customer name and phone.'
+            });
             return;
         }
 
@@ -890,13 +962,26 @@ document.querySelectorAll("[id^='confirmBtn-']").forEach(button => {
                 if (xhr.status == 200) {
                     var response = JSON.parse(xhr.responseText);
                     if (response.success) {
-                        alert("Booking confirmed for table #" + tableId);
-                        location.reload();
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success',
+                            text: 'Booking confirmed for table #' + tableId
+                        }).then(() => {
+                            location.reload();
+                        });
                     } else {
-                        alert("Failed to confirm booking: " + response.message);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Failed to confirm booking: ' + response.message
+                        });
                     }
                 } else {
-                    alert("Error: " + xhr.status);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Error: ' + xhr.status
+                    });
                 }
             }
         };

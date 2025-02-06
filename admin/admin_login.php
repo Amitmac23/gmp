@@ -18,7 +18,7 @@ if (isset($_POST['login'])) {
         exit;
     } else {
         // Login failed
-        echo "<script>alert('Invalid Username or Password');</script>";
+        $errorMessage = "Invalid Username or Password";
     }
 }
 ?>
@@ -29,6 +29,8 @@ if (isset($_POST['login'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
     <div class="container mt-5">
@@ -45,5 +47,16 @@ if (isset($_POST['login'])) {
             <button type="submit" name="login" class="btn btn-primary w-100">Login</button>
         </form>
     </div>
+
+    <?php if (isset($errorMessage)): ?>
+        <script>
+            Swal.fire({
+                icon: 'error',
+                title: 'Login Failed',
+                text: '<?php echo $errorMessage; ?>',
+                confirmButtonText: 'OK'
+            });
+        </script>
+    <?php endif; ?>
 </body>
 </html>
