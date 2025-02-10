@@ -125,6 +125,7 @@ if (isset($_GET['delete_table_id'])) {
 }
 
 // Handle QR Code Generation Request
+// Handle QR Code Generation Request
 if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
     $table_id = $_GET['table_id'];
     $base_url = "http://192.168.29.236/gmp/customer/register_table.php";
@@ -137,7 +138,10 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
         mkdir($local_qr_dir, 0777, true);
     }
 
-    QRcode::png($qr_data, $qr_code_file);
+    // Check if the QR code file already exists
+    if (!file_exists($qr_code_file)) {
+        QRcode::png($qr_data, $qr_code_file);
+    }
 
     $qr_code_url = "../assets/qrcodes/table_$table_id.png";
     echo "<img src='$qr_code_url' alt='QR Code for Table $table_id' />";
@@ -379,10 +383,22 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
 
 function showQRCode(tableId) {
     const qrCodeUrl = "../assets/qrcodes/table_" + tableId + ".png"; // Adjust the path as needed
-    document.getElementById('qrCodeImage').src = qrCodeUrl;
-    document.getElementById('tableNumberText').innerText = "Table Number: " + tableId;
-    const qrCodeModal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
-    qrCodeModal.show();
+    const qrCodeImage = document.getElementById('qrCodeImage');
+    const tableNumberText = document.getElementById('tableNumberText');
+
+    // Check if the QR code image exists
+    const img = new Image();
+    img.onload = function() {
+        qrCodeImage.src = qrCodeUrl;
+        tableNumberText.innerText = "Table Number: " + tableId;
+        const qrCodeModal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
+        qrCodeModal.show();
+    };
+    img.onerror = function() {
+        // If the QR code image does not exist, generate it
+        window.location.href = "?generate_qr_code=1&table_id=" + tableId;
+    };
+    img.src = qrCodeUrl;
 }
 
 function printQRCode() {
