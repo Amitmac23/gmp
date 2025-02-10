@@ -137,9 +137,7 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
         mkdir($local_qr_dir, 0777, true);
     }
 
-    if (!file_exists($qr_code_file)) {
-        QRcode::png($qr_data, $qr_code_file);
-    }
+    QRcode::png($qr_data, $qr_code_file);
 
     $qr_code_url = "../assets/qrcodes/table_$table_id.png";
     echo "<img src='$qr_code_url' alt='QR Code for Table $table_id' />";
