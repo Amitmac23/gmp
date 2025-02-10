@@ -125,7 +125,6 @@ if (isset($_GET['delete_table_id'])) {
 }
 
 // Handle QR Code Generation Request
-// Handle QR Code Generation Request
 if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
     $table_id = $_GET['table_id'];
     $base_url = "http://192.168.29.236/gmp/customer/register_table.php";
@@ -143,11 +142,10 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
         QRcode::png($qr_data, $qr_code_file);
     }
 
-    $qr_code_url = "../assets/qrcodes/table_$table_id.png";
-    echo "<img src='$qr_code_url' alt='QR Code for Table $table_id' />";
+    // Redirect back to the main page with a success parameter
+    header("Location: manage_tables.php?show_qr_code=1&table_id=$table_id");
     exit;
 }
-
 ?>
 
 <!-- HTML and Bootstrap for Display -->
@@ -399,6 +397,15 @@ function showQRCode(tableId) {
         window.location.href = "?generate_qr_code=1&table_id=" + tableId;
     };
     img.src = qrCodeUrl;
+}
+
+// Check if the page was redirected with a QR code generation request
+if (window.location.href.includes('?show_qr_code=1')) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tableId = urlParams.get('table_id');
+    if (tableId) {
+        showQRCode(tableId);
+    }
 }
 
 function printQRCode() {
