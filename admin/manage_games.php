@@ -173,10 +173,10 @@ $games = $stmt->fetchAll();
             background-color: #ff8a00;
         }
         .container {
-            margin-top: 50px;
+            margin-top: 30px;
         }
         .add-game-btn {
-            margin-top: 30px;
+            margin-top: 20px;
             background-color: #4CAF50;
             color: white;
             border-radius: 8px;
@@ -210,7 +210,7 @@ $games = $stmt->fetchAll();
 <!-- Main container for displaying games -->
 <div class="container" data-aos="fade-up">
     <!-- Back Button -->
-    <a href="javascript:history.back()" class="btn btn-secondary mb-3">
+    <a href="javascript:history.back()" class="btn btn-secondary mb-1">
         <i class="fas fa-arrow-left"></i> Back
     </a>
     <h1 class="text-center">Manage Games</h1>

@@ -118,32 +118,48 @@ $playerHistory = $stmt->fetchAll(PDO::FETCH_ASSOC); // Use associative fetch
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($playerHistory): ?>
-                        <?php foreach ($playerHistory as $index => $history): ?>
-                            <tr class="<?php echo $history['canceled'] ? 'table-danger' : ''; ?>">
-                                <td><?php echo $index + 1; ?></td>
-                                <td><?php echo htmlspecialchars($history['customer_name']); ?></td>
-                                <td><?php echo htmlspecialchars($history['phone']); ?></td>
-                                <td><?php echo htmlspecialchars($history['game_name']); ?></td>
-                                <td><?php echo date('d-m-Y h:i A', strtotime($history['start_time'])); ?></td>
-                                <td>
-                                    <?php echo $history['end_time'] ? date('d-m-Y h:i A', strtotime($history['end_time'])) : 'N/A'; ?>
-                                </td>
-                                <td>
-                                    <?php echo isset($history['end_time']) ? round((strtotime($history['end_time']) - strtotime($history['start_time'])) / 60) : 'N/A'; ?>
-                                </td>
-                                <td><?php echo number_format($history['total_price'], 2); ?></td>
-                                <td><?php echo htmlspecialchars($history['player_count']); ?></td>
-                                <td><?php echo htmlspecialchars($history['payment_status']); ?></td>
-                                <td><?php echo htmlspecialchars($history['payment_method']); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="11" class="text-center">No player history available.</td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
+    <?php if ($playerHistory): ?>
+        <?php foreach ($playerHistory as $index => $history): ?>
+            <tr class="<?php echo $history['canceled'] ? 'table-danger' : ''; ?>">
+                <td><?php echo $index + 1; ?></td>
+                <td><?php echo htmlspecialchars($history['customer_name']); ?></td>
+                <td><?php echo htmlspecialchars($history['phone']); ?></td>
+                <td><?php echo htmlspecialchars($history['game_name']); ?></td>
+                <td><?php echo date('d-m-Y h:i A', strtotime($history['start_time'])); ?></td>
+                <td>
+                    <?php echo $history['end_time'] ? date('d-m-Y h:i A', strtotime($history['end_time'])) : 'N/A'; ?>
+                </td>
+                <td>
+                    <?php echo isset($history['end_time']) ? round((strtotime($history['end_time']) - strtotime($history['start_time'])) / 60) : 'N/A'; ?>
+                </td>
+                <td><?php echo number_format($history['total_price'], 2); ?></td>
+                <td><?php echo htmlspecialchars($history['player_count']); ?></td>
+                <td>
+                    <?php 
+                    if ($history['canceled']) {
+                        echo "Canceled";
+                    } else {
+                        echo htmlspecialchars($history['payment_status']);
+                    }
+                    ?>
+                </td>
+                <td>
+                    <?php 
+                    if ($history['canceled']) {
+                        echo "Canceled";
+                    } else {
+                        echo htmlspecialchars($history['payment_method']);
+                    }
+                    ?>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <tr>
+            <td colspan="11" class="text-center">No player history available.</td>
+        </tr>
+    <?php endif; ?>
+</tbody>
             </table>
         </div>
     </div>

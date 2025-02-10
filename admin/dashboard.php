@@ -109,7 +109,7 @@ $pendingPayments = fetchPendingPayments();
             gap: 15px;
         }
         .table-card {
-            flex: 1 1 calc(20% - 15px);
+            flex: 0 1 calc(20% - 15px);
             border: 1px solid #dee2e6;
             border-radius: 8px;
             overflow: hidden;
@@ -420,6 +420,7 @@ function cancelBooking(tableId) {
             xhr.onreadystatechange = function () {
                 if (xhr.readyState == 4 && xhr.status == 200) {
                     var response = JSON.parse(xhr.responseText);
+
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
@@ -904,6 +905,12 @@ document.querySelectorAll("[id^='confirmBtn-']").forEach(button => {
         if (playerCountElement) {
             playerCount = playerCountElement.value; // Assign value if the element is found
         }
+
+        console.log('tt ',selectedGame);
+console.log('tt ',customerName);
+console.log('tt ',customerPhone);
+console.log('tt ',startTime);
+console.log('tt ',duration);
 
         if (!selectedGame) {
             Swal.fire({

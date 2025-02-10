@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"> 
     <style>
         /* General Styles */
         body {
@@ -85,6 +85,9 @@
             padding: 20px;
             text-align: center;
         }
+        .nav-link.active {
+    color: #007bff !important;
+}
     </style>
 </head>
 <body>
@@ -98,35 +101,33 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="http://localhost/gmp/admin/">Dashboard</a>
+                        <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'dashboard.php') ? 'active' : ''; ?>" href="../admin/">Dashboard</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="http://localhost/gmp/admin/manage_games.php">Manage Games</a>
+                        <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_games.php') ? 'active' : ''; ?>" href="../admin/manage_games.php">Manage Games</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="http://localhost/gmp/admin/manage_tables.php">Manage Tables</a>
+                        <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_tables.php') ? 'active' : ''; ?>" href="../admin/manage_tables.php">Manage Tables</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="http://localhost/gmp/admin/player_history.php">Player History</a>
+                        <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_table_games.php') ? 'active' : ''; ?>" href="../admin/manage_table_games.php">Assign Table</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="http://localhost/gmp/admin/manage_table_games.php">Assign Table</a>
+                        <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'player_history.php') ? 'active' : ''; ?>" href="../admin/player_history.php">Player History</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="http://localhost/gmp/admin/reports.php">Reports</a>
+                        <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'reports.php') ? 'active' : ''; ?>" href="../admin/reports.php">Reports</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="http://localhost/gmp/admin/logout.php">Log Out</a>
+                        <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'logout.php') ? 'active' : ''; ?>" href="../admin/logout.php">Log Out</a>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    
-
     <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script> 
     <script>
         // Custom Toggle Button Logic
         document.querySelector('.navbar-toggler').addEventListener('click', function () {

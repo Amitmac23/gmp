@@ -137,7 +137,9 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
         mkdir($local_qr_dir, 0777, true);
     }
 
-    QRcode::png($qr_data, $qr_code_file);
+    if (!file_exists($qr_code_file)) {
+        QRcode::png($qr_data, $qr_code_file);
+    }
 
     $qr_code_url = "../assets/qrcodes/table_$table_id.png";
     echo "<img src='$qr_code_url' alt='QR Code for Table $table_id' />";
@@ -154,6 +156,11 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- SweetAlert CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.min.css">
+
+<!-- SweetAlert JS -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.all.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>Manage Tables</title>
     <style>
@@ -219,9 +226,9 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
                                             <a href="#" class="btn btn-delete" onclick="confirmDelete(<?php echo $table['table_id']; ?>)">
                                                 <i class="fas fa-trash-alt"></i> Delete Table
                                             </a>
-                                            <a href="?generate_qr_code=true&table_id=<?php echo $table['table_id']; ?>" class="btn btn-success">
-                                                <i class="fas fa-qrcode"></i> Generate QR Code
-                                            </a>
+                                            <a href="#" class="btn btn-success" onclick="showQRCode(<?php echo $table['table_id']; ?>)">
+    <i class="fas fa-qrcode"></i> Generate QR Code
+</a>
                                         </div>
                                     </div>
                                 </div>
@@ -335,19 +342,75 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
     <?php endforeach; ?>
 </div>
 
+<!-- QR Code Modal -->
+<div class="modal fade" id="qrCodeModal" tabindex="-1" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="qrCodeModalLabel">QR Code</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p id="tableNumberText" class="mt-3"></p>
+                <p><img id="qrCodeImage" src="" alt="QR Code" class="img-fluid" style="max-width: 80%; height: auto;" /></p>
+                <button class="btn btn-primary mt-3" onclick="printQRCode()">Print QR Code</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Include Bootstrap JS and Popper.js -->
 <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
 <script>
     // JavaScript function to show the confirmation dialog
     function confirmDelete(tableId) {
-        // Confirm delete action
-        const isConfirmed = confirm("Are you sure you want to delete this table?");
-        if (isConfirmed) {
-            // Redirect to the delete action
+    Swal.fire({
+        title: 'Are you sure?',
+        text: 'You are about to delete this table!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'No, cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
             window.location.href = "?delete_table_id=" + tableId;
         }
-    }
+    });
+}
+
+function showQRCode(tableId) {
+    const qrCodeUrl = "../assets/qrcodes/table_" + tableId + ".png"; // Adjust the path as needed
+    document.getElementById('qrCodeImage').src = qrCodeUrl;
+    document.getElementById('tableNumberText').innerText = "Table Number: " + tableId;
+    const qrCodeModal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
+    qrCodeModal.show();
+}
+
+function printQRCode() {
+    const qrCodeImage = document.getElementById('qrCodeImage');
+    const tableNumberText = document.getElementById('tableNumberText');
+    const printWindow = window.open('', '_blank', 'height=600,width=800');
+
+    // Write the HTML content to the new window
+    printWindow.document.write('<html><head><title>Print QR Code</title>');
+    printWindow.document.write('<style>');
+    printWindow.document.write('body { text-align: center; font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; }');
+    printWindow.document.write('h1 { font-size: 24px; margin-bottom: 20px; }');
+    printWindow.document.write('p { font-size: 18px; font-weight: bold; margin-bottom: 20px; }');
+    printWindow.document.write('img { max-width: 100%; height: auto; margin: 0 auto; }');
+    printWindow.document.write('</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write('<p>' + tableNumberText.innerText + '</p>');
+    printWindow.document.write('<img src="' + qrCodeImage.src + '" />');
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+
+    // Focus on the new window and print it
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+}
 </script>
 </body>
 </html>
