@@ -69,7 +69,14 @@ if (isset($_POST['add_table'])) {
         $count = $checkStmt->fetchColumn();
 
         if ($count > 0) {
-            echo "<div style='color: red; font-weight: bold;'>Error: Table with the same number already exists for this game.</div>";
+            echo "<script>
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Table with the same number already exists for this game.',
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+            </script>";
         } else {
             // Insert the new table without the table_price_per_half_hour
             $stmt = $pdo->prepare("
@@ -77,10 +84,39 @@ if (isset($_POST['add_table'])) {
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([$game_id, $table_number, $status, $min_capacity, $max_capacity, $extra_charge]);
-            echo "<div style='color: green; font-weight: bold;'>Success: Table added successfully.</div>";
+
+            // Retrieve the last inserted table_id
+            $table_id = $pdo->lastInsertId();
+
+            // Insert the table_id and game_id into the table_game table
+            $stmt = $pdo->prepare("
+                INSERT INTO table_game (table_id, game_id)
+                VALUES (?, ?)
+            ");
+            $stmt->execute([$table_id, $game_id]);
+
+            echo "<script>
+                Swal.fire({
+                    title: 'Success',
+                    text: 'Table added successfully.',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = window.location.href + '?reload=true'; // Add a cache-busting parameter
+                    }
+                });
+            </script>";
         }
     } catch (PDOException $e) {
-        echo "<div style='color: red; font-weight: bold;'>Error: " . htmlspecialchars($e->getMessage()) . "</div>";
+        echo "<script>
+            Swal.fire({
+                title: 'Error',
+                text: 'Error: " . htmlspecialchars($e->getMessage()) . "',
+                icon: 'error',
+                confirmButtonText: 'OK'
+            });
+        </script>";
     }
 }
 
@@ -127,7 +163,7 @@ if (isset($_GET['delete_table_id'])) {
 // Handle QR Code Generation Request
 if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
     $table_id = $_GET['table_id'];
-    $base_url = "http://192.168.29.236/gmp/customer/register_table.php";
+    $base_url = "http://192.168.29.237/gmp/customer/register_table.php";
     $qr_data = $base_url . "?id=" . $table_id;
 
     $local_qr_dir = __DIR__ . '/../assets/qrcodes/';
@@ -157,7 +193,11 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- SweetAlert CSS -->
+<!-- SweetAlert CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.min.css">
+
+<!-- SweetAlert JS -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.all.min.js"></script>
 
 <!-- SweetAlert JS -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.all.min.js"></script>
@@ -354,6 +394,9 @@ if (isset($_GET['generate_qr_code']) && isset($_GET['table_id'])) {
                 <p id="tableNumberText" class="mt-3"></p>
                 <p><img id="qrCodeImage" src="" alt="QR Code" class="img-fluid" style="max-width: 80%; height: auto;" /></p>
                 <button class="btn btn-primary mt-3" onclick="printQRCode()">Print QR Code</button>
+                <a id="downloadLink" href="" class="btn btn-success mt-3" download>
+                    <i class="fas fa-download"></i> Download QR Code
+                </a>
             </div>
         </div>
     </div>
@@ -383,12 +426,25 @@ function showQRCode(tableId) {
     const qrCodeUrl = "../assets/qrcodes/table_" + tableId + ".png"; // Adjust the path as needed
     const qrCodeImage = document.getElementById('qrCodeImage');
     const tableNumberText = document.getElementById('tableNumberText');
+    const downloadLink = document.getElementById('downloadLink'); // Add this line
+
+    // Find the table number from the tables array
+    let tableNumber = '';
+    <?php foreach ($games_with_tables as $game): ?>
+        <?php foreach ($game['tables'] as $table): ?>
+            if (tableId == <?php echo $table['table_id']; ?>) {
+                tableNumber = <?php echo json_encode($table['table_number']); ?>;
+            }
+        <?php endforeach; ?>
+    <?php endforeach; ?>
 
     // Check if the QR code image exists
     const img = new Image();
     img.onload = function() {
         qrCodeImage.src = qrCodeUrl;
-        tableNumberText.innerText = "Table Number: " + tableId;
+        tableNumberText.innerText = "Table Number: " + tableNumber;
+        downloadLink.href = qrCodeUrl; // Set the download link
+        downloadLink.download = "table_" + tableNumber + "_qr.png"; // Set the download file name with table number
         const qrCodeModal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
         qrCodeModal.show();
     };
@@ -407,6 +463,7 @@ if (window.location.href.includes('?show_qr_code=1')) {
         showQRCode(tableId);
     }
 }
+
 
 function printQRCode() {
     const qrCodeImage = document.getElementById('qrCodeImage');

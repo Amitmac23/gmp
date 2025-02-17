@@ -11,19 +11,16 @@ if (!$table_id) {
     exit;
 }
 
-// Fetch the game_id, price_per_half_hour, table_number, status, min_capacity, max_capacity, and extra_charge from the tables table
-// and join with the table_game table to get the game_id
+// Fetch the table details
 $stmt = $pdo->prepare("
     SELECT 
-        tg.game_id, 
-        t.price_per_half_hour, 
+        t.id AS table_id, 
         t.table_number, 
         t.status, 
         t.min_capacity, 
         t.max_capacity, 
         t.extra_charge
     FROM tables t
-    LEFT JOIN table_game tg ON t.id = tg.table_id
     WHERE t.id = :id
 ");
 $stmt->execute(['id' => $table_id]);
@@ -41,7 +38,7 @@ if ($table['status'] === 'booked') {
         display: flex; 
         align-items: center; 
         justify-content: center; 
-        height: 100vh; 
+        height: 50vh; 
         background-color: #f8f9fa; 
         font-family: Arial, sans-serif; 
         text-align: center;
@@ -54,40 +51,30 @@ if ($table['status'] === 'booked') {
     exit;
 }
 
-$game_id = $table['game_id']; // Get the game_id from the table_game relationship table
-$price_per_half_hour = $table['price_per_half_hour']; // Get the price per half-hour
-$min_capacity = $table['min_capacity']; // Get the min capacity
-$max_capacity = $table['max_capacity']; // Get the max capacity
-$extra_charge = $table['extra_charge']; // Get the extra charge per player
-
-// Fetch game details including price_per_half_hour, has_frame, and frame_price from the games table
+// Fetch all games associated with the table
 $stmt = $pdo->prepare("
-    SELECT g.price_per_half_hour, g.has_frame, g.frame_price
-    FROM games g
-    WHERE g.id = :game_id
+    SELECT g.id AS game_id, g.name AS game_name, g.price_per_half_hour, g.has_frame, g.frame_price, g.game_image
+    FROM table_game tg
+    JOIN games g ON tg.game_id = g.id
+    WHERE tg.table_id = :table_id
 ");
-$stmt->execute(['game_id' => $game_id]);
-$game = $stmt->fetch();
+$stmt->execute(['table_id' => $table_id]);
+$games = $stmt->fetchAll();
 
-// Check if the game exists
-if (!$game) {
-    echo "Game details not found.";
+// If no games are found, display an error
+if (empty($games)) {
+    echo "No games found for this table.";
     exit;
 }
 
-// Extract values
-$has_frame = $game['has_frame']; // Whether the game supports a frame
-$price_per_half_hour = $game['price_per_half_hour']; // Price per half-hour
-$frame_price = $game['frame_price']; // Price for the frame
-
-
 // Retrieve form data (customer details)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $game_id = $_POST['game_id'];
     $name = $_POST['name'];
     $phone = $_POST['phone'];
     $start_time_input = $_POST['start_time']; // Start time from the form
     $duration = $_POST['duration'];
-    $player_count = isset($_POST['player_count']) ? (int)$_POST['player_count'] : $min_capacity;
+    $player_count = isset($_POST['player_count']) ? (int)$_POST['player_count'] : $table['min_capacity'];
 
     // Validate and format the start time
     try {
@@ -106,29 +93,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $end_time_formatted = $end_time->format('Y-m-d H:i:s');
         }
 
+        // Fetch game details
+        $stmt = $pdo->prepare("
+            SELECT price_per_half_hour, has_frame, frame_price
+            FROM games
+            WHERE id = :game_id
+        ");
+        $stmt->execute(['game_id' => $game_id]);
+        $game = $stmt->fetch();
 
-     if ($duration === null || $duration === 'frame') {
-    // Handle frame case
-    $total_price = $frame_price; // Use frame price
-    if ($player_count > $min_capacity) {
-        // Calculate extra charge for additional players
-        $extra_players = $player_count - $min_capacity;
-        $total_price += $extra_players * $extra_charge; // Add extra charge for the extra players
-    }
+        if (!$game) {
+            echo "Game details not found.";
+            exit;
+        }
 
-    // Update the frame column in the bookings table
-    $stmt = $pdo->prepare("UPDATE bookings SET frame = 1 WHERE id = :table_id");
-    $stmt->execute(['table_id' => $table_id]);
-} else {
-    // Calculate total price based on the duration, price per half-hour, and extra charge
-    $total_price = ($price_per_half_hour * ($duration / 60)); // Base price for the duration
-    if ($player_count > $min_capacity) {
-        // Calculate extra charge for additional players
-        $extra_players = $player_count - $min_capacity;
-        $total_price += $extra_players * $extra_charge; // Add extra charge for the extra players
-    }
-}
+        $price_per_half_hour = $game['price_per_half_hour'];
+        $has_frame = $game['has_frame'];
+        $frame_price = $game['frame_price'];
 
+        if ($duration === null || $duration === 'frame') {
+            // Handle frame case
+            $total_price = $frame_price; // Use frame price
+            if ($player_count > $table['min_capacity']) {
+                // Calculate extra charge for additional players
+                $extra_players = $player_count - $table['min_capacity'];
+                $total_price += $extra_players * $table['extra_charge']; // Add extra charge for the extra players
+            }
+
+            // Update the frame column in the bookings table
+            $stmt = $pdo->prepare("UPDATE bookings SET frame = 1 WHERE id = :table_id");
+            $stmt->execute(['table_id' => $table_id]);
+        } else {
+            // Calculate total price based on the duration, price per half-hour, and extra charge
+            $total_price = ($price_per_half_hour * ($duration / 60)); // Base price for the duration
+            if ($player_count > $table['min_capacity']) {
+                // Calculate extra charge for additional players
+                $extra_players = $player_count - $table['min_capacity'];
+                $total_price += $extra_players * $table['extra_charge']; // Add extra charge for the extra players
+            }
+        }
 
         // Check if the customer already exists
         $stmt = $pdo->prepare("SELECT id FROM customers WHERE name = :name AND phone = :phone");
@@ -178,10 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // error_log($e->getMessage());
     }
 }
-
 ?>
-
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -191,175 +191,200 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Register for Table</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-   <style>
-    body {
-        background: url('../assets/images/8 pool.jpg') no-repeat center center fixed;
-        background-size: cover;
-        font-family: 'Roboto', sans-serif;
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0;
-    }
-    .container {
-        background: rgba(0, 0, 0, 0.7);
-        padding: 20px;
-        border-radius: 15px;
-        max-width: 600px;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
-        color: #fff;
-        width: 90%;
-        margin: auto;
-    }
-    .card-header {
-        font-family: 'Press Start 2P', cursive;
-        font-size: 2rem;
-        text-align: center;
-        color: #ff8a00;
-        margin-bottom: 20px;
-    }
-    .form-label, .form-control {
-        font-size: 1rem;
-        margin-bottom: 15px;
-    }
-    .form-label {
-        color: #f0f0f0;
-    }
-    .form-control {
-        border-radius: 12px;
-        padding: 10px;
-        border: 2px solid #ff8a00;
-        background: #444;
-        color: white;
-    }
-    .form-control:focus {
-        border-color: #e52e71;
-        box-shadow: 0 0 5px rgba(229, 46, 113, 0.5);
-    }
-    .btn {
-        border-radius: 30px;
-        background: #ff8a00;
-        color: white;
-        font-size: 1.1rem;
-        padding: 12px;
-        width: 100%;
-        margin-top: 20px;
-        transition: background 0.3s;
-    }
-    .btn:hover {
-        background: #e52e71;
-    }
-    .input-group {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-    }
-    .input-group button {
-        background: #ff8a00;
-        color: #fff;
-        border: none;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        transition: background 0.3s ease;
-    }
-    .input-group button:hover {
-        background: #e52e71;
-    }
-    .input-group input {
-        text-align: center;
-        width: 450px;
-        border: 2px solid #ff8a00;
-        background: #444;
-        color: white;
-        border-radius: 8px;
-        font-size: 1rem;
-        padding: 5px;
-    }
-
-    /* Media Queries for Small Screens */
-    @media (max-width: 600px) {
-        .card-header {
-            font-size: 1.6rem;
-            margin-top: 20px;
-        }
+    <style>
         body {
-            padding: 10px;
+            background: url('../assets/images/8 pool.jpg') no-repeat center center fixed;
+            background-size: cover;
+            font-family: 'Roboto', sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
         }
         .container {
+            background: rgba(0, 0, 0, 0.7);
             padding: 20px;
-            margin-top: 20px;
+            border-radius: 15px;
+            max-width: 600px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
+            color: #fff;
+            width: 90%;
+            margin: auto;
+        }
+        .card-header {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 2rem;
+            text-align: center;
+            color: #ff8a00;
+            margin-bottom: 20px;
         }
         .form-label, .form-control {
-            font-size: 0.9rem;
-        }
-        .input-group button {
-            width: 35px;
-            height: 35px;
             font-size: 1rem;
+            margin-bottom: 15px;
         }
-        .input-group input {
-            width: 200px;
+        .form-label {
+            color: #f0f0f0;
+        }
+        .form-control {
+            border-radius: 12px;
+            padding: 10px;
+            border: 2px solid #ff8a00;
+            background: #444;
+            color: white;
+        }
+        .form-control:focus {
+            border-color: #e52e71;
+            box-shadow: 0 0 5px rgba(229, 46, 113, 0.5);
         }
         .btn {
-            font-size: 1rem;
-            padding: 10px;
+            border-radius: 30px;
+            background: #ff8a00;
+            color: white;
+            font-size: 1.1rem;
+            padding: 12px;
+            width: 100%;
+            margin-top: 20px;
+            transition: background 0.3s;
         }
-    }
-</style>
+        .btn:hover {
+            background: #e52e71;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .input-group button {
+            background: #ff8a00;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: background 0.3s ease;
+        }
+        .input-group button:hover {
+            background: #e52e71;
+        }
+        .input-group input {
+            text-align: center;
+            width: 450px;
+            border: 2px solid #ff8a00;
+            background: #444;
+            color: white;
+            border-radius: 8px;
+            font-size: 1rem;
+            padding: 5px;
+        }
 
+        .row>* {
+    width: 50%;
+}
+
+        /* Media Queries for Small Screens */
+        @media (max-width: 600px) {
+            .card-header {
+                font-size: 1.6rem;
+                margin-top: 20px;
+            }
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px;
+                margin-top: 20px;
+            }
+            .form-label, .form-control {
+                font-size: 0.9rem;
+            }
+            .input-group button {
+                width: 35px;
+                height: 35px;
+                font-size: 1rem;
+            }
+            .input-group input {
+                width: 200px;
+            }
+            .btn {
+                font-size: 1rem;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
 <body>
     <div class="container">
     <h3 class="card-header">Register for Table <?= $table['table_number'] ?></h3>
-    <div class="form-container">
-        <form method="POST" action="">
-            <label for="name" class="form-label">Customer Name:</label>
-            <input type="text" name="name" id="name" class="form-control" required>
-
-            <label for="phone" class="form-label">Phone Number:</label>
-            <input type="text" name="phone" id="phone" class="form-control" required 
-                   maxlength="10" pattern="\d{10}" title="Enter a valid 10-digit phone number">
-
-            <label for="start_time" class="form-label">Start Time:</label>
-            <select name="start_time" id="start_time" class="form-control" required></select>
-
-            <label for="duration" class="form-label">Duration:</label>
-            <select name="duration" id="duration" class="form-control" required>
-                <option value="30">30 Minutes</option>
-                <option value="60">1 Hour</option>
-                <option value="90">1.5 Hours</option>
-                <option value="120">2 Hours</option>
-
-                <?php if ($has_frame === 'yes'): ?>
-                <option value="frame">Frame</option>
-            <?php endif; ?>
-            </select>
-         <div class="mt-3">
-                <label for="player_count" class="form-label">Player Count:</label>
-                <div class="input-group">
-                    <button type="button" id="decreasePlayer">-</button>
-                    <input type="text" id="player_count" name="player_count" value="1" readonly>
-                    <button type="button" id="increasePlayer">+</button>
+    <div id="gameSelection">
+        <label for="game" class="form-label">Select Game:</label>
+        <div id="gameImages" class="row justify-content-center">
+            <?php foreach ($games as $game): ?>
+                <div class="col-md-4 col-sm-6 col-12 mb-3 text-center">
+                    <div class="game-image" data-game-id="<?php echo $game['game_id']; ?>">
+                        <img src="../assets/images/<?php echo htmlspecialchars($game['game_image']); ?>" alt="<?php echo htmlspecialchars($game['game_name']); ?>" class="img-fluid" style="width: 100px; height: 100px; border-radius: 10px;">
+                        <p><?php echo htmlspecialchars($game['game_name']); ?></p>
+                    </div>
                 </div>
-            </div>
-
-            <label for="end_time" class="form-label">Exit Time:</label>
-            <input type="text" name="end_time" id="end_time" class="form-control" readonly>
-
-            <label for="total_price" class="form-label">Total Price:</label>
-            <input type="text" name="total_price" id="total_price" class="form-control" readonly>
-
-            <button type="submit" class="btn">Confirm Booking</button>
-        </form>
+            <?php endforeach; ?>
+        </div>
     </div>
-</div>
-  <script>
+
+        <div id="bookingForm" style="display: none;">
+            <form method="POST" action="">
+                <input type="hidden" name="game_id" id="selectedGameId">
+                <label for="name" class="form-label">Customer Name:</label>
+                <input type="text" name="name" id="name" class="form-control" required>
+
+                <label for="phone" class="form-label">Phone Number:</label>
+                <input type="text" name="phone" id="phone" class="form-control" required 
+                       maxlength="10" pattern="\d{10}" title="Enter a valid 10-digit phone number">
+
+                <label for="start_time" class="form-label">Start Time:</label>
+                <select name="start_time" id="start_time" class="form-control" required></select>
+
+                <label for="duration" class="form-label">Duration:</label>
+                <select name="duration" id="duration" class="form-control" required>
+                    <option value="30">30 Minutes</option>
+                    <option value="60">1 Hour</option>
+                    <option value="90">1.5 Hours</option>
+                    <option value="120">2 Hours</option>
+
+                    <?php if ($game['has_frame'] === 'yes'): ?>
+                        <option value="frame">Frame</option>
+                    <?php endif; ?>
+                </select>
+
+                <div class="mt-3">
+                    <label for="player_count" class="form-label">Player Count:</label>
+                    <div class="input-group">
+                        <button type="button" id="decreasePlayer">-</button>
+                        <input type="text" id="player_count" name="player_count" value="1" readonly>
+                        <button type="button" id="increasePlayer">+</button>
+                    </div>
+                </div>
+
+                <label for="end_time" class="form-label">Exit Time:</label>
+                <input type="text" name="end_time" id="end_time" class="form-control" readonly>
+
+                <label for="total_price" class="form-label">Total Price:</label>
+                <input type="text" name="total_price" id="total_price" class="form-control" readonly>
+
+                <button type="submit" class="btn">Confirm Booking</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const gameImages = document.querySelectorAll('#gameImages .game-image');
+    const bookingForm = document.getElementById('bookingForm');
+    const selectedGameId = document.getElementById('selectedGameId');
+    const gameSelection = document.getElementById('gameSelection');
     const timeSelect = document.getElementById('start_time');
     const durationInput = document.getElementById('duration');
     const endTimeInput = document.getElementById('end_time');
@@ -369,11 +394,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const decreasePlayer = document.getElementById('decreasePlayer');
 
     // Fetched from PHP dynamically
-    const minCapacity = <?php echo $min_capacity; ?>;
-    const maxCapacity = <?php echo $max_capacity; ?>;
-    const extraChargePerPlayer = <?php echo $extra_charge; ?>;
-    const pricePerHalfHour = <?php echo $price_per_half_hour; ?>;
-    const framePrice = <?php echo $frame_price; ?>; // Add frame price
+    const minCapacity = <?php echo $table['min_capacity']; ?>;
+    const maxCapacity = <?php echo $table['max_capacity']; ?>;
+    const extraChargePerPlayer = <?php echo $table['extra_charge']; ?>;
+
+    // Initialize default values
+    let pricePerHalfHour = <?php echo $games[0]['price_per_half_hour']; ?>; // Default price
+    let framePrice = <?php echo $games[0]['has_frame'] === 'yes' ? $games[0]['frame_price'] : 0; ?>; // Default frame price
 
     // Fetch current time and add 5 minutes
     const currentTime = new Date();
@@ -414,11 +441,21 @@ document.addEventListener('DOMContentLoaded', () => {
         // Handle "Frame" selection
         if (duration === 'frame') {
             endTimeInput.value = 'Full Game'; // Show "Full Game" as end time
-            let totalPrice = framePrice; // Use frame price
+            let totalPrice = parseFloat(framePrice); // Ensure framePrice is a number
+
+            if (isNaN(totalPrice)) {
+                alert('Invalid frame price.');
+                return;
+            }
+
             if (playerCount > minCapacity) {
                 const extraPlayers = playerCount - minCapacity;
-                totalPrice += extraPlayers * extraChargePerPlayer; // Add extra charges for additional players
+                const extraCharge = parseFloat(extraChargePerPlayer); // Ensure extraChargePerPlayer is a number
+                if (!isNaN(extraCharge)) {
+                    totalPrice += extraPlayers * extraCharge; // Add extra charges for additional players
+                }
             }
+
             totalPriceInput.value = totalPrice.toFixed(2); // Update total price
             return;
         }
@@ -439,12 +476,14 @@ document.addEventListener('DOMContentLoaded', () => {
             endTimeInput.value = formatTime(exitTime);
 
             // Calculate the base price based on duration and price per half hour
-            let totalPrice = (durationMinutes / 60) * pricePerHalfHour;
+            let totalPrice = parseFloat(pricePerHalfHour) * (durationMinutes / 60);
 
-            // Apply extra charge for each player exceeding the minimum capacity
             if (playerCount > minCapacity) {
                 const extraPlayers = playerCount - minCapacity;
-                totalPrice += extraPlayers * extraChargePerPlayer;
+                const extraCharge = parseFloat(extraChargePerPlayer);
+                if (!isNaN(extraCharge)) {
+                    totalPrice += extraPlayers * extraCharge;
+                }
             }
 
             totalPriceInput.value = totalPrice.toFixed(2);
@@ -453,6 +492,27 @@ document.addEventListener('DOMContentLoaded', () => {
             durationInput.value = '';
         }
     }
+
+    gameImages.forEach(game => {
+        game.addEventListener('click', () => {
+            selectedGameId.value = game.dataset.gameId;
+
+            // Fetch game details from PHP array
+            const gameDetails = <?php echo json_encode($games); ?>;
+            const selectedGame = gameDetails.find(g => g.game_id == game.dataset.gameId);
+
+            if (selectedGame) {
+                pricePerHalfHour = parseFloat(selectedGame.price_per_half_hour);
+                framePrice = selectedGame.has_frame === 'yes' ? parseFloat(selectedGame.frame_price) : 0;
+            } else {
+                console.error('Selected game not found in game details.');
+            }
+
+            gameSelection.style.display = 'none';
+            bookingForm.style.display = 'block';
+            updateDetails();
+        });
+    });
 
     increasePlayer.addEventListener('click', () => {
         let currentCount = parseInt(playerCountInput.value);
@@ -474,11 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     timeSelect.addEventListener('change', updateDetails);
     durationInput.addEventListener('input', updateDetails);
-
-    updateDetails();
 });
-
-
-</script>
+    </script>
 </body>
 </html>

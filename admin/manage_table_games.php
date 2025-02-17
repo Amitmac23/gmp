@@ -11,7 +11,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 // Include the database connection
 require_once '../config/config.php';
 
-// Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['assign_table'])) {
         // Assign table to games
@@ -30,12 +29,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // Success message
-            $message = "Games have been successfully assigned to the table!";
-            $alert_class = "alert-success";
+            echo "<script>
+                Swal.fire({
+                    title: 'Success',
+                    text: 'Games have been successfully assigned to the table!',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.reload();
+                    }
+                });
+            </script>";
         } catch (Exception $e) {
             // Error handling
-            $message = "Error: " . $e->getMessage();
-            $alert_class = "alert-danger";
+            echo "<script>
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Error: " . htmlspecialchars($e->getMessage()) . "',
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+            </script>";
         }
     }
 }
@@ -48,6 +63,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assign Games to Table</title>
+    <!-- SweetAlert CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.min.css">
+
+<!-- SweetAlert JS -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.all.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>

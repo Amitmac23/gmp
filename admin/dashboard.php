@@ -63,6 +63,7 @@ function fetchPendingPayments() {
             b.id AS booking_id,  -- Include booking ID
             b.table_id, 
             b.total_price, 
+            b.duration,
             c.name AS customer_name, 
             b.payment_status, 
             b.payment_method,
@@ -99,36 +100,79 @@ $pendingPayments = fetchPendingPayments();
 <!-- SweetAlert JS -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.all.min.js"></script>
     <title>Dashboard - Manage Tables</title>
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .table-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
+<style>
+    body {
+        background-color: #f8f9fa;
+        margin: 0;
+        font-family: Arial, sans-serif;
+    }
+
+    .table-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        padding: 15px;
+    }
+
+    .table-card {
+        flex: 0 1 calc(20% - 15px);
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+    }
+
+    .table-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .table-card-header {
+        background-color: #007bff;
+        color: white;
+        padding: 10px;
+        font-weight: bold;
+    }
+
+    .table-card-body {
+        padding: 15px;
+        background-color: #ffffff;
+    }
+
+    .badge {
+        font-size: 14px;
+    }
+
+    @media (max-width: 768px) {
         .table-card {
-            flex: 0 1 calc(20% - 15px);
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            flex: 0 1 calc(50% - 15px);
+        }
+    }
+
+    @media (max-width: 480px) {
+        .table-card {
+            flex: 0 1 100%;
+            margin-bottom: 15px;
+        }
+    }
+
+    @media (max-width: 320px) {
+        .table-card {
+            flex: 0 1 100%;
+            margin-bottom: 15px;
         }
         .table-card-header {
-            background-color: #007bff;
-            color: white;
-            padding: 10px;
-            font-weight: bold;
+            padding: 8px;
+            font-size: 16px;
         }
         .table-card-body {
-            padding: 15px;
-            background-color: #ffffff;
+            padding: 10px;
         }
         .badge {
-            font-size: 14px;
+            font-size: 12px;
         }
-    </style>
+    }
+</style>
 </head>
 <body>
 <div class="container mt-5">
@@ -223,7 +267,7 @@ $pendingPayments = fetchPendingPayments();
     if (!empty($games)):
         foreach ($games as $game): ?>
             <div class="form-check mb-2">
-                <input type="radio" class="form-check-input" name="selectedGame-<?php echo htmlspecialchars($table['table_id']); ?>" id="game-<?php echo htmlspecialchars($game['id']); ?>" value="<?php echo htmlspecialchars($game['id']); ?>" data-has-frame="<?php echo htmlspecialchars($game['has_frame']); ?>" data-frame-price="<?php echo htmlspecialchars($game['frame_price']); ?>" data-min-capacity="<?php echo htmlspecialchars($game['min_capacity']); ?>" data-max-capacity="<?php echo htmlspecialchars($game['max_capacity']); ?>" data-extra-charge="<?php echo htmlspecialchars($game['extra_charge']); ?>">
+                <input type="radio" class="form-check-input" name="selectedGame-<?php echo htmlspecialchars($table['table_id']); ?>" id="game-<?php echo htmlspecialchars($game['id']); ?>" value="<?php echo htmlspecialchars($game['id']); ?>" data-has-frame="<?php echo htmlspecialchars($game['has_frame']); ?>" data-frame-price="<?php echo htmlspecialchars($game['frame_price']); ?>" data-min-capacity="<?php echo htmlspecialchars($table['min_capacity']); ?>" data-max-capacity="<?php echo htmlspecialchars($game['max_capacity']); ?>" data-extra-charge="<?php echo htmlspecialchars($game['extra_charge']); ?>">
                 <label class="form-check-label" for="game-<?php echo htmlspecialchars($game['id']); ?>">
                     <?php echo htmlspecialchars($game['name']); ?>
                 </label>
@@ -364,6 +408,7 @@ $pendingPayments = fetchPendingPayments();
                         <div class="modal-body">
                             <p><strong>Player:</strong> <?php echo htmlspecialchars($payment['customer_name']); ?></p>
                             <p><strong>Game:</strong> <?php echo htmlspecialchars($payment['game_name']); ?></p>
+                            <p><strong>Duration:</strong> <?php echo htmlspecialchars($payment['duration']); ?> minutes</p>
                             <p><strong>Total Price:</strong> ₹<?php echo number_format($payment['total_price'], 2); ?></p>
                             <p><strong>End Time:</strong> <?php echo date("h:i A", strtotime($payment['end_time'])); ?></p>
                             <p>Select Payment Method:</p>
@@ -713,6 +758,7 @@ function calculateBookingDetails(tableId) {
     const minCapacity = parseInt(selectedGame.getAttribute('data-min-capacity'), 10);
     const currentPlayerCount = parseInt(playerCountInput.value, 10) || 1;
 
+
     if (hasFrame && durationDropdown.value === 'frame') {
         // Calculate total price for frame
         let totalPrice = framePrice;
@@ -769,26 +815,30 @@ document.addEventListener("DOMContentLoaded", function () {
             startTimeDropdown.appendChild(option);
         }
 
-        async function fetchPricePerHour(gameId) {
-            try {
-                const response = await fetch(`fetch_price.php?game_id=${gameId}`);
-                const data = await response.json();
-                if (data.success) {
-                    const selectedGame = document.querySelector(`input[name='selectedGame-${tableId}']:checked`);
-                    if (selectedGame) {
-                        selectedGame.setAttribute('data-price-per-hour', data.price);
-                        selectedGame.setAttribute('data-min-capacity', data.min_capacity);
-                        selectedGame.setAttribute('data-max-capacity', data.max_capacity);
-                        selectedGame.setAttribute('data-extra-charge', data.extra_charge);
-                    }
-                    calculateBookingDetails(tableId);
-                } else {
-                    console.error("Failed to fetch price:", data.message);
-                }
-            } catch (error) {
-                console.error("Error fetching price:", error);
+       async function fetchPricePerHour(gameId, tableId) {
+    console.log('Fetching price for game ID:', gameId, 'and table ID:', tableId); // Debug: Log the parameters
+    try {
+        const response = await fetch(`fetch_price.php?game_id=${gameId}&table_id=${tableId}`);
+        const data = await response.json();
+        console.log('Fetch Price Response:', data); // Debug: Log the response data
+        if (data.success) {
+            const selectedGame = document.querySelector(`input[name='selectedGame-${tableId}']:checked`);
+            if (selectedGame) {
+                selectedGame.setAttribute('data-price-per-hour', data.price);
+                selectedGame.setAttribute('data-min-capacity', data.min_capacity);
+                selectedGame.setAttribute('data-max-capacity', data.max_capacity);
+                selectedGame.setAttribute('data-extra-charge', data.extra_charge);
+                console.log('Min Capacity:', data.min_capacity); // Log the min_capacity
+                console.log('Price:', data.price); // Log the price
             }
+            calculateBookingDetails(tableId);
+        } else {
+            console.error("Failed to fetch price:", data.message);
         }
+    } catch (error) {
+        console.error("Error fetching price:", error);
+    }
+}
 
         function updateDurationOptions(hasFrame) {
             durationDropdown.innerHTML = '';
@@ -818,7 +868,7 @@ document.addEventListener("DOMContentLoaded", function () {
             radio.addEventListener("change", function () {
                 if (this.checked) {
                     const hasFrame = this.getAttribute('data-has-frame');
-                    fetchPricePerHour(this.value);
+                    fetchPricePerHour(this.value,tableId);
                     updateDurationOptions(hasFrame);
                 }
             });

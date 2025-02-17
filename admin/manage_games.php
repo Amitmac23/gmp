@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_game'])) {
     if (empty($name)) {
         echo '<div class="alert alert-danger">Game name is required!</div>';
     } else {
-        $upload_dir = 'C:/xampp/htdocs/game_booking/assets/images/';
+        $upload_dir = '../assets/images/';
         $upload_file = $upload_dir . basename($game_image);
         $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $image_extension = strtolower(pathinfo($game_image, PATHINFO_EXTENSION));
@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_game'])) {
     } else {
         if ($_FILES['game_image']['name']) {
             $game_image = time() . '_' . basename($_FILES['game_image']['name']); // Prevent overwriting
-            $upload_dir = 'C:/xampp/htdocs/game_booking/assets/images/';
+            $upload_dir = '../assets/images/';
             $upload_file = $upload_dir . $game_image;
             $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
             $image_extension = strtolower(pathinfo($game_image, PATHINFO_EXTENSION));

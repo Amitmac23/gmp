@@ -137,7 +137,7 @@ $yearlyStats = fetchStats($pdo, 'yearly');
         <div class="col-md-3 mb-3">
             <div class="card shadow-lg border-0">
                 <div class="card-body text-center">
-                    <h6 class="text-muted">Daily Revenue</h6>
+                    <h6 class="text-muted">Today Revenue</h6>
                     <h5 class="text-primary">₹<?php echo number_format($dailyRevenue['total_revenue'] ?? 0, 2); ?></h5>
                 </div>
             </div>
@@ -196,7 +196,7 @@ $yearlyStats = fetchStats($pdo, 'yearly');
     <div class="d-flex align-items-center mt-2 mt-md-0">
         <label for="chartTypeSelector" class="me-2 text-secondary">Chart Type:</label>
         <select id="chartTypeSelector" class="form-select" style="width: 200px;">
-            <option value="daily">Daily</option>
+            <option value="daily">Today</option>
             <option value="yesterday">Yesterday</option>
             <option value="monthly">Monthly</option>
             <option value="yearly">Yearly</option>
@@ -310,7 +310,7 @@ let barChart = new Chart(barCtx, {
     }
 });
 
-// Update Chart and Table on Selector Change
+// Clear date inputs when a chart type is selected
 document.getElementById('chartTypeSelector').addEventListener('change', function (e) {
     let selectedData;
     let selectedTitle;
@@ -328,6 +328,10 @@ document.getElementById('chartTypeSelector').addEventListener('change', function
         selectedData = yearlyData;
         selectedTitle = 'Yearly Report';
     }
+
+    // Clear date inputs
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
 
     statsChart.data = extractChartData(selectedData);
     statsChart.update();
